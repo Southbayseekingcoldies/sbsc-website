@@ -19,7 +19,23 @@ const els = {
   submit: document.getElementById("submit"),
   dialog: document.getElementById("dialog"),
   close: document.getElementById("close"),
-  form: document.getElementById("form")
+  form: document.getElementById("form"),
+  submissionFields: document.getElementById("submissionFields"),
+  submissionSuccess: document.getElementById("submissionSuccess"),
+  doneSubmission: document.getElementById("doneSubmission"),
+  submitReading: document.getElementById("submitReading"),
+  submitMessage: document.getElementById("submitMessage"),
+  barName: document.getElementById("barName"),
+  barAddress: document.getElementById("barAddress"),
+  barCity: document.getElementById("barCity"),
+  barState: document.getElementById("barState"),
+  beerName: document.getElementById("beerName"),
+  temperatureF: document.getElementById("temperatureF"),
+  measuredAt: document.getElementById("measuredAt"),
+  photo: document.getElementById("photo"),
+  instagram: document.getElementById("instagram"),
+  notes: document.getElementById("notes"),
+  websiteField: document.getElementById("websiteField")
 };
 
 const map = L.map("map", { zoomControl: true }).setView([33.79, -118.31], 11);
@@ -306,15 +322,159 @@ function useLocation() {
   });
 }
 
+function localDateTimeValue(date = new Date()) {
+  const pad = n => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function resetSubmissionForm() {
+  els.form.reset();
+  els.barState.value = "CA";
+  els.measuredAt.value = localDateTimeValue();
+  els.submissionFields.hidden = false;
+  els.submissionSuccess.hidden = true;
+  els.submitMessage.className = "submit-message";
+  els.submitMessage.textContent = "";
+  els.submitReading.disabled = false;
+  els.submitReading.textContent = "Submit for Verification";
+}
+
+function showSubmitMessage(message, type = "error") {
+  els.submitMessage.textContent = message;
+  els.submitMessage.className = `submit-message ${type}`;
+}
+
+function safeFileExtension(file) {
+  const byType = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "image/heif": "heif"
+  };
+  if (byType[file.type]) return byType[file.type];
+  const match = file.name.toLowerCase().match(/\.([a-z0-9]{2,5})$/);
+  return match ? match[1] : "jpg";
+}
+
+function makeSubmissionId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function submitColdie(event) {
+  event.preventDefault();
+
+  // Simple bot trap. Humans never see this field.
+  if (els.websiteField.value) return;
+
+  if (!els.form.reportValidity()) return;
+
+  const photo = els.photo.files && els.photo.files[0];
+  if (!photo) {
+    showSubmitMessage("Please add a thermometer photo.");
+    return;
+  }
+  if (!photo.type.startsWith("image/")) {
+    showSubmitMessage("The evidence file must be an image.");
+    return;
+  }
+  if (photo.size > 10 * 1024 * 1024) {
+    showSubmitMessage("That photo is over 10 MB. Please choose a smaller image.");
+    return;
+  }
+
+  const temp = Number(els.temperatureF.value);
+  if (!Number.isInteger(temp) || temp < 20 || temp > 80) {
+    showSubmitMessage("Enter the thermometer reading as a whole number from 20°F to 80°F.");
+    return;
+  }
+
+  const measuredDate = new Date(els.measuredAt.value);
+  if (Number.isNaN(measuredDate.getTime())) {
+    showSubmitMessage("Please enter when the beer was measured.");
+    return;
+  }
+  if (measuredDate.getTime() > Date.now() + 5 * 60 * 1000) {
+    showSubmitMessage("The measurement time cannot be in the future.");
+    return;
+  }
+
+  els.submitReading.disabled = true;
+  els.submitReading.textContent = "Uploading…";
+  showSubmitMessage("Uploading thermometer photo…", "info");
+
+  const submissionId = makeSubmissionId();
+  const ext = safeFileExtension(photo);
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const photoPath = `${now.getFullYear()}/${month}/${submissionId}.${ext}`;
+
+  const { error: uploadError } = await supabaseClient.storage
+    .from("submission-photos")
+    .upload(photoPath, photo, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: photo.type || undefined
+    });
+
+  if (uploadError) {
+    console.error("Submission photo upload failed:", uploadError);
+    els.submitReading.disabled = false;
+    els.submitReading.textContent = "Submit for Verification";
+    showSubmitMessage("We couldn't upload the photo. Please try again.");
+    return;
+  }
+
+  els.submitReading.textContent = "Submitting…";
+  showSubmitMessage("Photo uploaded. Saving your reading…", "info");
+
+  const instagram = els.instagram.value.trim().replace(/^@+/, "");
+  const payload = {
+    bar_name: els.barName.value.trim(),
+    address: els.barAddress.value.trim(),
+    city: els.barCity.value.trim(),
+    state: "CA",
+    beer_name: els.beerName.value.trim(),
+    temperature_f: temp,
+    measured_at: measuredDate.toISOString(),
+    photo_path: photoPath,
+    submitter_instagram: instagram ? `@${instagram}` : null,
+    notes: els.notes.value.trim() || null,
+    status: "pending"
+  };
+
+  const { error: insertError } = await supabaseClient
+    .from("submissions")
+    .insert(payload);
+
+  if (insertError) {
+    console.error("Submission insert failed:", insertError);
+    els.submitReading.disabled = false;
+    els.submitReading.textContent = "Submit for Verification";
+    showSubmitMessage("The photo uploaded, but the reading could not be submitted. Please try again.");
+    return;
+  }
+
+  els.submissionFields.hidden = true;
+  els.submissionSuccess.hidden = false;
+}
+
 els.sort.addEventListener("change", render);
 els.temp.addEventListener("change", render);
 els.city.addEventListener("change", render);
 els.locate.addEventListener("click", useLocation);
-els.submit.addEventListener("click", () => els.dialog.showModal());
+els.submit.addEventListener("click", () => {
+  resetSubmissionForm();
+  els.dialog.showModal();
+});
 els.close.addEventListener("click", () => els.dialog.close());
-els.form.addEventListener("submit", event => {
-  event.preventDefault();
-  alert("Public submission is the next build step. For now, keep adding verified readings in Supabase.");
+els.doneSubmission.addEventListener("click", () => els.dialog.close());
+els.form.addEventListener("submit", submitColdie);
+els.dialog.addEventListener("click", event => {
+  if (event.target === els.dialog) els.dialog.close();
 });
 
 loadReadings();

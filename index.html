@@ -45,15 +45,42 @@
   </main>
 
   <dialog id="dialog">
-    <form id="form" method="dialog" class="submit-form">
-      <div class="dialog-head"><div><h3>Submit a Coldie</h3><p>Thermometer photo required for verification.</p></div><button id="close" type="button" class="ghost-x">✕</button></div>
-      <label><span>Bar name</span><input type="text" required /></label>
-      <label><span>City</span><input type="text" required /></label>
-      <label><span>Temperature °F</span><input type="number" min="20" max="80" step="1" required /></label>
-      <label><span>Beer</span><input type="text" required /></label>
-      <label><span>Thermometer photo</span><input type="file" accept="image/*" required /></label>
-      <button type="submit" class="hero-btn hero-btn-blue full">Continue</button>
-      <p class="small-note">Public submissions are the next build step. This form is a placeholder for now.</p>
+    <form id="form" class="submit-form">
+      <div class="dialog-head">
+        <div><h3>Submit a Coldie</h3><p>Every reading is reviewed before it appears on the map.</p></div>
+        <button id="close" type="button" class="ghost-x" aria-label="Close submission form">✕</button>
+      </div>
+
+      <div id="submissionFields">
+        <label><span>Bar / restaurant name</span><input id="barName" name="bar_name" type="text" maxlength="120" autocomplete="organization" required /></label>
+        <label><span>Street address</span><input id="barAddress" name="address" type="text" maxlength="180" autocomplete="street-address" placeholder="1101 S Pacific Ave" required /></label>
+        <div class="form-row">
+          <label><span>City</span><input id="barCity" name="city" type="text" maxlength="80" autocomplete="address-level2" required /></label>
+          <label class="state-field"><span>State</span><input id="barState" name="state" type="text" value="CA" readonly /></label>
+        </div>
+        <div class="form-row">
+          <label><span>Beer</span><input id="beerName" name="beer_name" type="text" maxlength="120" placeholder="Coors Light" required /></label>
+          <label><span>Temperature °F</span><input id="temperatureF" name="temperature_f" type="number" inputmode="numeric" min="20" max="80" step="1" placeholder="34" required /></label>
+        </div>
+        <label><span>Date &amp; time measured</span><input id="measuredAt" name="measured_at" type="datetime-local" required /></label>
+        <label><span>Thermometer photo <strong>required</strong></span><input id="photo" name="photo" type="file" accept="image/*" required /></label>
+        <p class="photo-help">Photo should clearly show the beer and thermometer reading. Maximum 10 MB.</p>
+        <label><span>Instagram handle <em>optional</em></span><input id="instagram" name="submitter_instagram" type="text" maxlength="80" placeholder="@yourhandle" autocapitalize="none" /></label>
+        <label><span>Notes <em>optional</em></span><textarea id="notes" name="notes" maxlength="500" rows="3" placeholder="Anything useful about the pour?"></textarea></label>
+
+        <input id="websiteField" name="website" type="text" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
+
+        <div id="submitMessage" class="submit-message" role="status" aria-live="polite"></div>
+        <button id="submitReading" type="submit" class="hero-btn hero-btn-blue full">Submit for Verification</button>
+        <p class="small-note">Submitting does not publish the reading. SBSC reviews the thermometer evidence first.</p>
+      </div>
+
+      <div id="submissionSuccess" class="submission-success" hidden>
+        <div class="success-icon">✓</div>
+        <h3>Submitted for verification.</h3>
+        <p>We’ll add it to the map once the thermometer evidence checks out. 🍺</p>
+        <button id="doneSubmission" type="button" class="hero-btn hero-btn-blue full">Done</button>
+      </div>
     </form>
   </dialog>
 
