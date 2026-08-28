@@ -1,10 +1,12 @@
-# SBSC Website v3.8
+# SBSC Website V4 — Mobile First
 
-Hero-only cleanup pass:
-- Rebuilt mountain-to-beach art as one coherent landscape.
-- Removed the red line that crossed the branding.
-- Reduced palm clutter to two cleaner palms.
-- Added coastal foothills to smooth the mountain → beach transition.
-- Enlarged and simplified the chalice.
-- Chalice now reads clearly as a full beer glass with foam, blue mountains, and red SBSC.
-- Kept one-line desktop title, button colors, short banner, filters, map, stats, and live Supabase behavior unchanged.
+Primary target: iPhone.
+- Shorter hero ending just below action buttons
+- Single hero background asset
+- Separate clean chalice logo asset
+- Compact mobile header
+- Map gets most of the first screen after header
+- Mobile stats are 2x2
+- Existing Supabase/Leaflet behavior preserved
+
+Upload all six files: index.html, styles.css, app.js, README.md, hero-bg.svg, logo.svg
