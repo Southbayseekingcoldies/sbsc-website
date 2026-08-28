@@ -5,8 +5,8 @@
 .hero{position:relative;overflow:hidden;height:160px;max-height:160px;border-bottom:3px solid var(--red);background:#dceeff}
 .hero-bg{position:absolute;inset:0;background-image:url('hero-bg-v55.png');background-position:center center;background-size:cover;background-repeat:no-repeat}
 .hero-actions{position:absolute;z-index:2;left:50%;bottom:8px;transform:translateX(-50%);width:min(calc(88% - 28px),560px);display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.hero-btn{min-width:0;border:0;border-radius:12px;padding:7px 10px;font-size:.78rem;line-height:1;font-weight:900;color:#fff;cursor:pointer;box-shadow:0 8px 18px rgba(15,31,55,.2)}
-.hero-btn-blue{background:linear-gradient(180deg,#0d63bd,#084988)}.hero-btn-red{background:linear-gradient(180deg,#ef1f29,#c51119)}.full{width:100%}
+.hero-btn{min-width:0;border:0;border-radius:12px;padding:4px 7px;font-size:.68rem;line-height:1;font-weight:900;color:#fff;cursor:pointer;box-shadow:0 8px 18px rgba(15,31,55,.2)}
+.hero-btn-blue{background:linear-gradient(180deg,#0d63bd,#084988)}.hero-btn-red{background:linear-gradient(180deg,#ef1f29,#c51119)}.full{width:88%}
 
 .container{max-width:1180px;margin:9px auto 0;padding:0 10px 36px;position:relative;z-index:3}
 .controls-panel,.map-shell,.results-head,.card,.submit-form,.stat-card{background:var(--card);border:1px solid rgba(255,255,255,.74);box-shadow:var(--shadow);border-radius:var(--radius)}
