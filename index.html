@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SBSC — South Bay Seeking Coldies</title>
+<meta name="description" content="Find the coldest verified draft beer in the South Bay.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hero">
+  <div class="brand">
+    <div class="logo">SBSC</div>
+    <div>
+      <h1>South Bay Seeking Coldies</h1>
+      <p>Verified cold draft beer. Thermometer or it didn’t happen.</p>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="locate" class="primary">📍 Use My Location</button>
+    <button id="submit" class="secondary">🍺 Submit a Coldie</button>
+  </div>
+</header>
+
+<main>
+<section class="filters">
+  <label>Sort
+    <select id="sort">
+      <option value="coldest">Coldest first</option>
+      <option value="nearest">Nearest first</option>
+      <option value="recent">Newest reading</option>
+    </select>
+  </label>
+  <label>Max temp
+    <select id="temp">
+      <option value="999">Any verified temp</option>
+      <option value="35" selected>35°F or colder</option>
+      <option value="32">32°F or colder</option>
+      <option value="30">30°F or colder</option>
+    </select>
+  </label>
+  <label>City
+    <select id="city"><option value="all">All South Bay</option></select>
+  </label>
+</section>
+
+<section class="map-card">
+  <div id="map"></div>
+  <div class="legend"><span>≤30°F Elite</span><span>31–35°F Cold</span><span>36°F+ Needs work</span></div>
+</section>
+
+<section class="heading">
+  <div>
+    <h2>Verified Coldies</h2>
+    <p id="status">Prototype sample readings.</p>
+  </div>
+  <div id="count" class="badge"></div>
+</section>
+<section id="cards" class="cards"></section>
+</main>
+
+<dialog id="dialog">
+<form id="form">
+  <div class="dialog-head">
+    <div><h2>Submit a Coldie</h2><p>Thermometer photo required for verification.</p></div>
+    <button id="close" type="button">✕</button>
+  </div>
+  <label>Bar name<input name="bar" required placeholder="e.g. Harbor Bar"></label>
+  <div class="two">
+    <label>City<input name="city" required placeholder="San Pedro"></label>
+    <label>Temperature °F<input name="temp" required type="number" min="20" max="80" step=".1" placeholder="29"></label>
+  </div>
+  <label>Beer<input name="beer" required placeholder="Modelo Especial draft"></label>
+  <label>Thermometer photo<input name="photo" required type="file" accept="image/*"></label>
+  <label>Notes<textarea name="notes" rows="3"></textarea></label>
+  <button class="primary submit-button" type="submit">Submit for verification</button>
+  <p class="note">Prototype only — this form is not connected to the database yet.</p>
+</form>
+</dialog>
+
+<footer><b>SBSC</b> · South Bay Seeking Coldies</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
