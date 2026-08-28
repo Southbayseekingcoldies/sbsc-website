@@ -424,7 +424,8 @@ async function submitColdie(event) {
     console.error("Submission photo upload failed:", uploadError);
     els.submitReading.disabled = false;
     els.submitReading.textContent = "Submit for Verification";
-    showSubmitMessage("We couldn't upload the photo. Please try again.");
+    const detail = uploadError.message || uploadError.error || uploadError.statusCode || "Unknown Supabase Storage error";
+    showSubmitMessage(`Upload failed: ${detail}`);
     return;
   }
 
@@ -454,7 +455,8 @@ async function submitColdie(event) {
     console.error("Submission insert failed:", insertError);
     els.submitReading.disabled = false;
     els.submitReading.textContent = "Submit for Verification";
-    showSubmitMessage("The photo uploaded, but the reading could not be submitted. Please try again.");
+    const detail = insertError.message || insertError.details || insertError.code || "Unknown database error";
+    showSubmitMessage(`Photo uploaded, but submission failed: ${detail}`);
     return;
   }
 
