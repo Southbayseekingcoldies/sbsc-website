@@ -1,19 +1,18 @@
-# SBSC V5.6 — Public Submissions
+# SBSC V5.8 — Mobile Admin Review
 
-This build preserves the V5.5 visual design and approved hero image, while making **Submit a Coldie** functional.
+Public V5.7 site preserved, including the current index.html/styles.css button sizing and hero art.
 
-## Submission flow
-1. Visitor opens Submit a Coldie.
-2. Visitor enters bar, address, city, beer, whole-number °F reading, measurement time, required thermometer photo, and optional Instagram/notes.
-3. Photo uploads to the private Supabase Storage bucket `submission-photos`.
-4. A row is inserted into `public.submissions` with `status = pending`.
-5. Pending submissions do not appear on the public map.
+New:
+- `/admin` mobile review page
+- Supabase email/password admin login
+- Pending submissions + private thermometer evidence photos
+- Address geocoding before approval
+- One-tap Approve / Reject
+- Approve reuses/creates the bar, creates an approved reading, then marks submission approved
 
-## Supabase assumptions
-- Existing `bars` and `readings` tables remain unchanged.
-- `public.submissions` exists with the schema/RLS created for V5.6.
-- Private Storage bucket `submission-photos` exists.
-- Anonymous/authenticated users have INSERT-only policies for the pending submission row and photo upload.
+## One-time Supabase step
+Run `supabase-admin-functions.sql` in Supabase SQL Editor.
 
-## Deployment
-Upload the files in this folder to the root of the existing GitHub repository. Vercel should redeploy automatically.
+## Deploy
+Upload all files/folders to the repo root. Keep the `admin` folder intact.
+After Vercel deploys, open `/admin/` on your site.
