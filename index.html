@@ -1,26 +1,126 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SBSC — South Bay Seeking Coldies</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SBSC — South Bay Seeking Coldies</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<header class="hero"><div class="brand"><div class="logo">SBSC</div><div><h1>South Bay Seeking Coldies</h1><p>Verified cold draft beer. Thermometer or it didn’t happen.</p></div></div><div class="actions"><button id="locate" class="primary">📍 Use My Location</button><button id="submit" class="secondary">🍺 Submit a Coldie</button></div></header>
-<main>
-<section class="filters">
-<label>Sort<select id="sort"><option value="coldest">Coldest first</option><option value="nearest">Nearest first</option><option value="recent">Newest reading</option></select></label>
-<label>Max temp<select id="temp"><option value="999">Any verified temp</option><option value="35" selected>35°F or colder</option><option value="32">32°F or colder</option><option value="30">30°F or colder</option></select></label>
-<label>City<select id="city"><option value="all">All South Bay</option></select></label>
-</section>
-<section class="map-card"><div id="map"></div><div class="legend"><span>≤30°F Elite</span><span>31–35°F Cold</span><span>36°F+ Needs work</span></div></section>
-<section class="heading"><div><h2>Verified Coldies</h2><p id="status">Loading live SBSC readings…</p></div><div id="count" class="badge"></div></section>
-<section id="cards" class="cards"></section>
-</main>
-<dialog id="dialog"><form id="form"><div class="dialog-head"><div><h2>Submit a Coldie</h2><p>Thermometer photo required for verification.</p></div><button id="close" type="button">✕</button></div><label>Bar name<input required></label><label>City<input required></label><label>Temperature °F<input required type="number" min="20" max="80" step=".1"></label><label>Beer<input required></label><label>Thermometer photo<input required type="file" accept="image/*"></label><button class="primary submit-button" type="submit">Continue</button><p class="note">Community uploads are the next feature. This form does not submit yet.</p></form></dialog>
-<footer><b>SBSC</b> · South Bay Seeking Coldies</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
-</body></html>
+  <header class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-inner">
+      <div class="brand-wrap">
+        <div class="logo-badge" aria-label="SBSC logo">
+          <div class="logo-peak"></div>
+          <span>SBSC</span>
+        </div>
+        <div class="brand-copy">
+          <h1>South Bay Seeking Coldies</h1>
+          <p class="subhead">Verified cold draft beer. Thermometer or it didn’t happen.</p>
+          <p class="tagline">35°F OR BELOW, THAT’S A COLDIE!</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button id="locate" class="btn btn-primary">Use My Location</button>
+        <button id="submit" class="btn btn-secondary">Submit a Coldie</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="stats-grid" id="statsGrid">
+      <article class="stat-card">
+        <div class="stat-label">Average Draft Temp</div>
+        <div class="stat-value" id="avgTemp">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Passing Rate</div>
+        <div class="stat-value" id="passRate">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Coldest Pour</div>
+        <div class="stat-value" id="coldestPour">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Worst Offender</div>
+        <div class="stat-value" id="worstOffender">--</div>
+      </article>
+    </section>
+
+    <section class="controls-panel">
+      <label>
+        <span>Sort</span>
+        <select id="sort">
+          <option value="coldest">Coldest first</option>
+          <option value="nearest">Nearest first</option>
+          <option value="recent">Newest reading</option>
+          <option value="warmest">Warmest first</option>
+        </select>
+      </label>
+      <label>
+        <span>Max temp</span>
+        <select id="temp">
+          <option value="999" selected>Any verified temp</option>
+          <option value="35">35°F or colder</option>
+          <option value="32">32°F or colder</option>
+          <option value="30">30°F or colder</option>
+        </select>
+      </label>
+      <label>
+        <span>City</span>
+        <select id="city">
+          <option value="all">All South Bay</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="map-shell">
+      <div id="map"></div>
+      <div class="legend">
+        <span><i class="dot elite"></i> ≤30°F Elite</span>
+        <span><i class="dot pass"></i> 31–35°F Coldie</span>
+        <span><i class="dot fail"></i> 36°F+ Fail</span>
+      </div>
+    </section>
+
+    <section class="results-head">
+      <div>
+        <h2>Verified Readings</h2>
+        <p id="status">Loading live SBSC readings…</p>
+      </div>
+      <div class="results-meta">
+        <div class="badge" id="count">0 results</div>
+      </div>
+    </section>
+
+    <section id="cards" class="cards"></section>
+  </main>
+
+  <dialog id="dialog">
+    <form id="form" method="dialog" class="submit-form">
+      <div class="dialog-head">
+        <div>
+          <h3>Submit a Coldie</h3>
+          <p>Thermometer photo required for verification.</p>
+        </div>
+        <button id="close" type="button" class="ghost-x">✕</button>
+      </div>
+      <label><span>Bar name</span><input type="text" required /></label>
+      <label><span>City</span><input type="text" required /></label>
+      <label><span>Temperature °F</span><input type="number" min="20" max="80" step="1" required /></label>
+      <label><span>Beer</span><input type="text" required /></label>
+      <label><span>Thermometer photo</span><input type="file" accept="image/*" required /></label>
+      <button type="submit" class="btn btn-primary full">Continue</button>
+      <p class="small-note">The public submission workflow is the next build step. This form is a placeholder for now.</p>
+    </form>
+  </dialog>
+
+  <footer class="site-footer">SBSC · South Bay Seeking Coldies</footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
