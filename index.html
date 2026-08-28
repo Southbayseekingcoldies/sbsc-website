@@ -9,113 +9,44 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="hero">
+  <header class="hero" aria-label="South Bay Seeking Coldies — Verified cold draft beer. Thermometer or it didn’t happen. 35°F or below. That’s a Coldie!">
     <div class="hero-bg" aria-hidden="true"></div>
-    <div class="hero-overlay" aria-hidden="true"></div>
-    <div class="hero-content">
-      <div class="brand-copy">
-        <h1>South Bay Seeking Coldies</h1>
-        <p class="subhead">Verified cold draft beer. Thermometer or it didn’t happen.</p>
-        <p class="tagline"><strong>35°F OR BELOW. THAT’S A</strong> <em>COLDIE!</em></p>
-      </div>
-      <div class="hero-actions">
-        <button id="locate" class="hero-btn hero-btn-red">📍 Use My Location</button>
-        <button id="submit" class="hero-btn hero-btn-blue">🍺 Submit a Coldie</button>
-      </div>
+    <h1 class="sr-only">South Bay Seeking Coldies</h1>
+    <div class="hero-actions">
+      <button id="locate" class="hero-btn hero-btn-red">📍 Use My Location</button>
+      <button id="submit" class="hero-btn hero-btn-blue">🍺 Submit a Coldie</button>
     </div>
   </header>
 
   <main class="container">
     <section class="controls-panel">
-      <label>
-        <span>Sort</span>
-        <select id="sort">
-          <option value="coldest">Coldest first</option>
-          <option value="nearest">Nearest first</option>
-          <option value="recent">Newest reading</option>
-          <option value="warmest">Warmest first</option>
-        </select>
-      </label>
-      <label>
-        <span>Max temp</span>
-        <select id="temp">
-          <option value="999" selected>Any verified temp</option>
-          <option value="35">35°F or colder</option>
-          <option value="32">32°F or colder</option>
-          <option value="30">30°F or colder</option>
-        </select>
-      </label>
-      <label>
-        <span>City</span>
-        <select id="city">
-          <option value="all">All South Bay</option>
-        </select>
-      </label>
+      <label><span>Sort</span><select id="sort"><option value="coldest">Coldest first</option><option value="nearest">Nearest first</option><option value="recent">Newest reading</option><option value="warmest">Warmest first</option></select></label>
+      <label><span>Max temp</span><select id="temp"><option value="999" selected>Any verified temp</option><option value="35">35°F or colder</option><option value="32">32°F or colder</option><option value="30">30°F or colder</option></select></label>
+      <label><span>City</span><select id="city"><option value="all">All South Bay</option></select></label>
     </section>
 
     <section class="map-shell">
       <div id="map"></div>
-      <div class="legend">
-        <span><i class="dot elite"></i> ≤30°F Elite</span>
-        <span><i class="dot pass"></i> 31–35°F Coldie</span>
-        <span><i class="dot fail"></i> 36°F+ Fail</span>
-      </div>
+      <div class="legend"><span><i class="dot elite"></i> ≤30°F Elite</span><span><i class="dot pass"></i> 31–35°F Coldie</span><span><i class="dot fail"></i> 36°F+ Fail</span></div>
     </section>
 
     <section class="stats-grid" id="statsGrid">
-      <article class="stat-card stat-blue">
-        <div class="stat-icon">🌡️</div>
-        <div>
-          <div class="stat-value" id="avgTemp">--</div>
-          <div class="stat-label">Average Draft Temp</div>
-        </div>
-      </article>
-      <article class="stat-card stat-green">
-        <div class="stat-icon">✓</div>
-        <div>
-          <div class="stat-value" id="passRate">--</div>
-          <div class="stat-label">Passing Rate <small>(35°F or below)</small></div>
-        </div>
-      </article>
-      <article class="stat-card stat-blue">
-        <div class="stat-icon">❄️</div>
-        <div>
-          <div class="stat-value" id="coldestPour">--</div>
-          <div class="stat-label">Coldest Pour</div>
-        </div>
-      </article>
-      <article class="stat-card stat-red">
-        <div class="stat-icon">!</div>
-        <div>
-          <div class="stat-value" id="worstOffender">--</div>
-          <div class="stat-label">Worst Offender</div>
-        </div>
-      </article>
+      <article class="stat-card stat-blue"><div class="stat-icon">🌡️</div><div><div class="stat-value" id="avgTemp">--</div><div class="stat-label">Average Draft Temp</div></div></article>
+      <article class="stat-card stat-green"><div class="stat-icon">✓</div><div><div class="stat-value" id="passRate">--</div><div class="stat-label">Passing Rate <small>(35°F or below)</small></div></div></article>
+      <article class="stat-card stat-blue"><div class="stat-icon">❄️</div><div><div class="stat-value" id="coldestPour">--</div><div class="stat-label">Coldest Pour</div></div></article>
+      <article class="stat-card stat-red"><div class="stat-icon">!</div><div><div class="stat-value" id="worstOffender">--</div><div class="stat-label">Worst Offender</div></div></article>
     </section>
 
     <section class="results-head">
-      <div class="results-title">
-        <span class="verified-mark">✓</span>
-        <div>
-          <h2>Verified Readings</h2>
-          <p id="status">Loading live SBSC readings…</p>
-        </div>
-      </div>
+      <div class="results-title"><span class="verified-mark">✓</span><div><h2>Verified Readings</h2><p id="status">Loading live SBSC readings…</p></div></div>
       <div class="badge" id="count">0 results</div>
     </section>
-
     <section id="cards" class="cards"></section>
   </main>
 
   <dialog id="dialog">
     <form id="form" method="dialog" class="submit-form">
-      <div class="dialog-head">
-        <div>
-          <h3>Submit a Coldie</h3>
-          <p>Thermometer photo required for verification.</p>
-        </div>
-        <button id="close" type="button" class="ghost-x">✕</button>
-      </div>
+      <div class="dialog-head"><div><h3>Submit a Coldie</h3><p>Thermometer photo required for verification.</p></div><button id="close" type="button" class="ghost-x">✕</button></div>
       <label><span>Bar name</span><input type="text" required /></label>
       <label><span>City</span><input type="text" required /></label>
       <label><span>Temperature °F</span><input type="number" min="20" max="80" step="1" required /></label>
@@ -127,7 +58,6 @@
   </dialog>
 
   <footer class="site-footer">SBSC · South Bay Seeking Coldies</footer>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>

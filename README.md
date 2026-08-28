@@ -1,14 +1,13 @@
-# SBSC Website v5.4
+# SBSC Website v5.5
 
-This package includes a cleaned-up mobile-first hero/header:
-- max banner height 160px
-- separate HTML buttons
-- shorter hero with integrated chalice logo in the background art
-- unchanged wording
-- existing live Supabase connection preserved
+- Uses the approved Option 2-style hero asset with logo/title/subhead/35°F wording baked into the background image.
+- Only the two CTA buttons are live HTML elements.
+- Banner is capped at 160px tall.
+- Supabase + Leaflet behavior is preserved from the working build.
 
-Upload/replace these files in the repo root:
+Upload these files to the GitHub repo root:
 - index.html
 - styles.css
 - app.js
-- hero-bg-v54.png
+- hero-bg-v55.png
+- README.md
