@@ -1,18 +1,18 @@
-
 :root {
-  --bg: #eef3f8;
-  --card: rgba(255,255,255,0.92);
-  --line: #d7e0ec;
-  --text: #0f1726;
-  --muted: #5f6b7b;
-  --blue-1: #0b4fd3;
-  --blue-2: #0f75ff;
-  --ice: #dff4ff;
-  --steel: #8091a8;
+  --bg: #eef2f7;
+  --card: rgba(255, 255, 255, 0.93);
+  --line: #d4dde9;
+  --text: #0d1827;
+  --muted: #5f6978;
+  --blue-1: #0748c8;
+  --blue-2: #65a7ef;
+  --silver-1: #eef3f8;
+  --silver-2: #d3ddea;
+  --silver-3: #8ea0b7;
   --elite: #0a7cff;
-  --pass: #12b7c8;
+  --pass: #13b9cb;
   --fail: #ef4444;
-  --shadow: 0 18px 35px rgba(15, 30, 60, 0.10);
+  --shadow: 0 18px 34px rgba(11, 28, 56, 0.12);
   --radius: 18px;
 }
 
@@ -22,7 +22,7 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(255,255,255,0.7), transparent 28%),
+    radial-gradient(circle at top left, rgba(255,255,255,0.82), transparent 28%),
     linear-gradient(180deg, #f7f9fc 0%, var(--bg) 100%);
 }
 button, input, select { font: inherit; }
@@ -31,46 +31,41 @@ button, input, select { font: inherit; }
   position: relative;
   overflow: hidden;
   color: white;
-  background:
-    linear-gradient(115deg, rgba(168,0,18,0.92) 0 7%, rgba(168,0,18,0) 22%),
-    linear-gradient(135deg, #dce9f7 0%, #89bce8 24%, #1b77d1 57%, #0a3e96 100%);
-  border-bottom: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(90deg, #f2f6fb 0%, #d7e3f1 20%, #8fbee8 72%, #5f96dc 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.22);
 }
-.hero-bg {
+.hero-chrome {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(155deg, transparent 0 62%, rgba(174,0,22,0.88) 62.5% 64%, transparent 64.5% 100%),
-    linear-gradient(to bottom, rgba(255,255,255,0.30), rgba(255,255,255,0.02)),
-    radial-gradient(circle at 80% 8%, rgba(255,255,255,0.34), transparent 19%),
-    radial-gradient(circle at 14% 12%, rgba(255,255,255,0.22), transparent 17%);
-}
-.hero::before,
-.hero::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+    linear-gradient(130deg, rgba(255,255,255,0.46) 0%, rgba(255,255,255,0.08) 26%, rgba(255,255,255,0.0) 55%),
+    linear-gradient(95deg, rgba(214, 38, 46, 0.0) 0%, rgba(214, 38, 46, 0.0) 58%, rgba(214, 38, 46, 0.26) 78%, rgba(214, 38, 46, 0.42) 100%);
   pointer-events: none;
 }
 .hero::before {
-  height: 120px;
-  background: linear-gradient(to top, rgba(7, 31, 75, 0.60), rgba(72, 120, 172, 0.12));
-  clip-path: polygon(0 100%, 0 72%, 12% 42%, 18% 58%, 27% 24%, 37% 55%, 47% 16%, 61% 60%, 74% 20%, 83% 49%, 92% 31%, 100% 62%, 100% 100%);
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 290px;
+  height: 6px;
+  background: linear-gradient(90deg, #d7262e, #ff4f58);
+  box-shadow: 0 0 14px rgba(215, 38, 46, 0.42);
+  z-index: 3;
 }
-.hero::after {
-  height: 128px;
-  background: linear-gradient(to top, rgba(245,249,255,0.92), rgba(198,222,245,0.20));
-  clip-path: polygon(0 100%, 0 75%, 11% 46%, 20% 64%, 31% 27%, 43% 59%, 53% 18%, 65% 65%, 76% 26%, 86% 57%, 95% 35%, 100% 57%, 100% 100%);
-  opacity: 0.8;
+.mountain-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 .hero-inner {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 28px 18px 138px;
+  padding: 28px 18px 132px;
   display: flex;
   gap: 20px;
   align-items: flex-start;
@@ -80,71 +75,72 @@ button, input, select { font: inherit; }
 .brand-wrap { display: flex; gap: 16px; align-items: flex-start; }
 .logo-badge {
   position: relative;
-  width: 92px;
-  min-width: 92px;
-  height: 92px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(226,239,255,0.94));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 10px 20px rgba(0,0,0,0.14);
+  width: 96px;
+  min-width: 96px;
+  height: 96px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(226,237,250,0.96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 12px 22px rgba(0,0,0,0.18);
   display: grid;
   place-items: center;
-  border: 2px solid rgba(255,255,255,0.55);
-}
-
-.logo-badge::after {
-  content: "";
-  position: absolute;
-  width: 58px;
-  height: 6px;
-  background: linear-gradient(90deg, #a50018, #ef2435);
-  border-radius: 999px;
-  transform: rotate(-18deg);
-  bottom: 17px;
-  right: 8px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.55);
+  border: 2px solid rgba(255,255,255,0.62);
 }
 .logo-badge span {
-  font-weight: 900;
-  font-size: 1.35rem;
-  letter-spacing: 0.08em;
-  color: #0a3fad;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  font-weight: 1000;
+  font-size: 1.42rem;
+  letter-spacing: 0.09em;
+  color: #0b43b3;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.55);
 }
-.logo-peak {
+.logo-top {
   position: absolute;
   top: 10px;
-  left: 12px;
-  right: 12px;
-  height: 28px;
-  background: linear-gradient(180deg, #b0d6ff, #edf7ff);
-  clip-path: polygon(0 100%, 15% 68%, 30% 45%, 38% 61%, 48% 20%, 61% 62%, 74% 36%, 87% 73%, 100% 100%);
+  left: 11px;
+  right: 11px;
+  height: 30px;
+  background: linear-gradient(180deg, #d7262e 0%, #ff5760 100%);
+  clip-path: polygon(0 100%, 16% 70%, 31% 44%, 40% 58%, 52% 18%, 64% 64%, 77% 34%, 89% 75%, 100% 100%);
   border-radius: 6px;
-  opacity: 0.95;
+  box-shadow: 0 3px 12px rgba(215,38,46,0.35);
 }
-.brand-copy h1 {
+.brand-copy {
+  padding-top: 4px;
+  max-width: 680px;
+}
+.site-title {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.25rem);
-  line-height: 0.96;
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-family: "Brush Script MT", "Segoe Script", "Snell Roundhand", "URW Chancery L", cursive;
+  font-size: clamp(2.8rem, 5vw, 4.8rem);
+  line-height: 0.94;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #d7262e;
+  text-shadow:
+    -1px -1px 0 rgba(255,255,255,0.98),
+     1px -1px 0 rgba(255,255,255,0.98),
+    -1px  1px 0 rgba(255,255,255,0.98),
+     1px  1px 0 rgba(255,255,255,0.98),
+     0 4px 18px rgba(8, 22, 47, 0.26);
+  transform: skew(-7deg);
 }
 .subhead {
   margin: 8px 0 0;
-  font-size: 1.08rem;
-  color: rgba(255,255,255,0.92);
+  font-size: 1.05rem;
+  color: rgba(255,255,255,0.97);
+  text-shadow: 0 2px 8px rgba(7, 24, 48, 0.4);
 }
 .tagline {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   display: inline-block;
   font-size: 0.92rem;
   font-weight: 900;
   letter-spacing: 0.06em;
-  color: white;
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.25);
-  padding: 8px 12px;
+  color: #ffffff;
+  background: rgba(214, 38, 46, 0.84);
+  border: 1px solid rgba(255,255,255,0.28);
+  padding: 9px 12px;
   border-radius: 999px;
-  backdrop-filter: blur(2px);
+  box-shadow: 0 10px 18px rgba(7, 24, 48, 0.18);
 }
 .hero-actions {
   display: flex;
@@ -165,53 +161,27 @@ button, input, select { font: inherit; }
   color: #0a42b5;
 }
 .btn-secondary {
-  background: rgba(8,25,62,0.3);
+  background: rgba(9, 27, 58, 0.38);
   color: white;
-  border: 1px solid rgba(255,255,255,0.24);
+  border: 1px solid rgba(255,255,255,0.25);
 }
 .btn.full { width: 100%; }
 
 .container {
   max-width: 1180px;
-  margin: -72px auto 0;
+  margin: -88px auto 0;
   padding: 0 18px 40px;
   position: relative;
-  z-index: 3;
-}
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
-}
-.stat-card {
-  background: var(--card);
-  border: 1px solid rgba(255,255,255,0.72);
-  box-shadow: var(--shadow);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-  backdrop-filter: blur(10px);
-}
-.stat-label {
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.stat-value {
-  margin-top: 7px;
-  font-size: clamp(1.4rem, 2.5vw, 2rem);
-  font-weight: 900;
-  line-height: 1;
+  z-index: 5;
 }
 .controls-panel,
 .map-shell,
+.stats-grid,
 .results-head,
 .card,
 .submit-form {
   background: var(--card);
-  border: 1px solid rgba(255,255,255,0.74);
+  border: 1px solid rgba(255,255,255,0.77);
   box-shadow: var(--shadow);
   border-radius: var(--radius);
 }
@@ -236,7 +206,6 @@ select, input[type="text"], input[type="number"], input[type="file"] {
   padding: 14px 14px;
   color: var(--text);
 }
-
 .map-shell { overflow: hidden; margin-bottom: 16px; }
 #map { height: 500px; width: 100%; }
 .legend {
@@ -259,7 +228,32 @@ select, input[type="text"], input[type="number"], input[type="file"] {
 .dot.elite { background: var(--elite); }
 .dot.pass { background: var(--pass); }
 .dot.fail { background: var(--fail); }
-
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px;
+}
+.stat-card {
+  background: linear-gradient(180deg, #ffffff, #f3f7fb);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 15px 16px;
+}
+.stat-label {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.stat-value {
+  margin-top: 7px;
+  font-size: clamp(1.2rem, 2vw, 1.9rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
 .results-head {
   display: flex;
   justify-content: space-between;
@@ -301,7 +295,7 @@ select, input[type="text"], input[type="number"], input[type="file"] {
 .place-meta, .address-line { font-size: 0.96rem; }
 .beer-line, .time-line, .status-line { font-size: 0.95rem; margin-top: 6px; }
 .temp-chip {
-  min-width: 86px;
+  min-width: 88px;
   text-align: center;
   border-radius: 14px;
   font-weight: 900;
@@ -375,20 +369,16 @@ dialog::backdrop { background: rgba(5, 10, 26, 0.55); }
 .popup-judgment { font-weight: 800; margin-top: 6px; }
 
 @media (max-width: 940px) {
-  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .controls-panel { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cards { grid-template-columns: 1fr; }
 }
-@media (max-width: 640px) {
-  .hero-inner { padding-bottom: 126px; }
+@media (max-width: 700px) {
+  .hero-inner { padding-bottom: 122px; }
   .brand-wrap { flex-direction: column; }
-  .logo-badge { width: 82px; min-width: 82px; height: 82px; }
+  .logo-badge { width: 84px; min-width: 84px; height: 84px; }
+  .site-title { font-size: clamp(2.3rem, 8vw, 3.5rem); }
   .stats-grid { grid-template-columns: 1fr; }
   .results-head { flex-direction: column; align-items: flex-start; }
   #map { height: 420px; }
-}
-
-.map-stats {
-  margin-top: 16px;
-  margin-bottom: 16px;
 }

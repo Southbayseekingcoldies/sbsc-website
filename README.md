@@ -1,35 +1,17 @@
-# SBSC Website V3
+# SBSC Website V3.3
 
-V3 adds the stronger SBSC visual identity and live mission framing:
+V3.3 pushes the top banner much harder into an icy mountain lager visual language while keeping the site original.
 
-- Rocky-mountain-inspired hero banner (original artwork style, not copied brand art)
-- More aggressive SBSC badge styling
-- Adds tagline: `35°F OR BELOW, THAT’S A COLDIE!`
-- Default filter is now `Any verified temp`
-- Whole-number Fahrenheit display only
-- Shows PASS / FAIL clearly for each reading
-- Shows live stats: average temp, passing rate, coldest pour, worst offender
-- Keeps the map as the main tool
+Changes:
+- More aggressive silver/blue mountain banner with red accents
+- Red script-style main title for South Bay Seeking Coldies
+- Better mountain art and more detailed hero styling
+- Stats remain below the map and above Verified Readings
+- Restores emoji on the main action buttons
+- Keeps live Supabase connection and all map/filter functionality
 
-## Deploy steps
-1. Open your GitHub repo `sbsc-website`
-2. Replace these four files:
-   - `index.html`
-   - `styles.css`
-   - `app.js`
-   - `README.md`
-3. Commit the changes
-4. Vercel should auto-redeploy
-
-## Notes
-- Public submission form is still placeholder-only
-- Data source remains Supabase
-- Uses approved readings only
-
-
-## V3.1 tweaks
-- Moved live stats to the bottom below map/results.
-- Restored 📍 and 🍺 button icons.
-- Strengthened the original Rocky Mountain beer-brand visual with icy silver/blue mountains and red accents while keeping the artwork original.
-
-V3.2 layout tweak: stats now sit directly below the map and above Verified Readings.
+Deploy by replacing these four files in GitHub:
+- index.html
+- styles.css
+- app.js
+- README.md

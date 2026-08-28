@@ -9,15 +9,50 @@
 </head>
 <body>
   <header class="hero">
-    <div class="hero-bg"></div>
+    <div class="hero-chrome"></div>
+    <svg class="mountain-art" viewBox="0 0 1600 430" aria-hidden="true" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#eef6ff"/>
+          <stop offset="28%" stop-color="#cfe7ff"/>
+          <stop offset="62%" stop-color="#8bc0ff"/>
+          <stop offset="100%" stop-color="#5f96dc"/>
+        </linearGradient>
+        <linearGradient id="metalGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="24%" stop-color="#ebf2fb"/>
+          <stop offset="50%" stop-color="#b1c2d9"/>
+          <stop offset="100%" stop-color="#6f86a1"/>
+        </linearGradient>
+        <linearGradient id="steelGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#f8fbff"/>
+          <stop offset="35%" stop-color="#dae5f0"/>
+          <stop offset="65%" stop-color="#90a6be"/>
+          <stop offset="100%" stop-color="#5d728c"/>
+        </linearGradient>
+        <linearGradient id="shadowGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#3c5372"/>
+          <stop offset="100%" stop-color="#1f3654"/>
+        </linearGradient>
+      </defs>
+      <rect width="1600" height="430" fill="url(#skyGrad)"/>
+      <path d="M0 28 C210 75, 450 8, 690 48 C930 88, 1180 20, 1600 56 L1600 0 L0 0 Z" fill="rgba(255,255,255,0.32)"/>
+      <path d="M0 135 L100 120 L220 160 L340 108 L435 138 L540 100 L650 150 L760 110 L900 160 L1040 120 L1180 170 L1290 138 L1410 165 L1600 130 L1600 430 L0 430 Z" fill="rgba(15,53,105,0.14)"/>
+      <path d="M0 430 L0 245 L95 220 L165 160 L240 210 L325 128 L398 180 L505 72 L605 206 L710 118 L816 248 L930 96 L1030 168 L1148 86 L1260 190 L1378 108 L1492 210 L1600 175 L1600 430 Z" fill="url(#shadowGrad)" opacity="0.72"/>
+      <path d="M0 430 L0 275 L118 246 L210 168 L286 220 L392 116 L475 168 L572 58 L670 226 L776 132 L882 262 L1006 84 L1118 174 L1236 72 L1362 205 L1484 122 L1600 190 L1600 430 Z" fill="url(#metalGrad)"/>
+      <path d="M0 430 L0 310 L102 290 L198 224 L270 256 L384 146 L470 190 L565 96 L650 246 L756 160 L858 292 L1000 118 L1106 204 L1236 98 L1350 222 L1480 150 L1600 220 L1600 430 Z" fill="url(#steelGrad)" opacity="0.95"/>
+      <path d="M392 146 L426 132 L444 150 L470 136 L492 166 L470 190 Z M565 96 L594 82 L620 100 L645 80 L666 128 L650 246 Z M1000 118 L1038 95 L1068 120 L1102 96 L1130 142 L1106 204 Z M1236 98 L1272 74 L1305 102 L1338 88 L1370 136 L1350 222 Z" fill="#ffffff" opacity="0.98"/>
+      <path d="M352 168 L404 151 L466 165 L532 127 L602 114 L678 140 L748 153 L834 179 L936 141 L1040 130 L1134 144 L1236 115 L1334 135 L1422 149" fill="none" stroke="#d7262e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+      <path d="M0 430 L0 388 L180 348 L280 370 L392 320 L470 354 L585 302 L678 366 L786 318 L912 384 L1034 324 L1122 358 L1240 310 L1358 350 L1460 326 L1600 362 L1600 430 Z" fill="rgba(255,255,255,0.18)"/>
+    </svg>
     <div class="hero-inner">
       <div class="brand-wrap">
         <div class="logo-badge" aria-label="SBSC logo">
-          <div class="logo-peak"></div>
+          <div class="logo-top"></div>
           <span>SBSC</span>
         </div>
         <div class="brand-copy">
-          <h1>South Bay Seeking Coldies</h1>
+          <h1 class="site-title">South Bay Seeking Coldies</h1>
           <p class="subhead">Verified cold draft beer. Thermometer or it didn’t happen.</p>
           <p class="tagline">35°F OR BELOW, THAT’S A COLDIE!</p>
         </div>
@@ -66,7 +101,7 @@
       </div>
     </section>
 
-    <section class="stats-grid map-stats" id="statsGrid">
+    <section class="stats-grid" id="statsGrid">
       <article class="stat-card">
         <div class="stat-label">Average Draft Temp</div>
         <div class="stat-value" id="avgTemp">--</div>
@@ -102,7 +137,7 @@
     <form id="form" method="dialog" class="submit-form">
       <div class="dialog-head">
         <div>
-          <h3>🍺 Submit a Coldie</h3>
+          <h3>Submit a Coldie</h3>
           <p>Thermometer photo required for verification.</p>
         </div>
         <button id="close" type="button" class="ghost-x">✕</button>
