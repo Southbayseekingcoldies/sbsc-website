@@ -1,23 +1,18 @@
-# SBSC Website v3.5
-
-# SBSC Website V3.4
-
-This version implements the approved mountain-to-beach visual concept while keeping the real live SBSC data stack intact.
+# SBSC Website v3.6
 
 Changes:
-- Large mountain-to-South-Bay beach hero illustration built in CSS
-- Palm trees / coastline / icy mountain treatment
-- Stronger shield-style SBSC badge
-- Red script-style South Bay Seeking Coldies headline
-- Large location and submit buttons with emojis
-- Map remains the main tool
-- Stats remain directly below the map
-- Verified reading cards remain live from Supabase
+- Shorter hero/banner so the map is the visual priority
+- Desktop title is one line: South Bay Seeking Coldies
+- Simplified logo into a beer chalice/goblet
+- Removed extra words from the logo
+- Red script-style SBSC treatment inside the chalice
+- Keeps the mountain-to-beach South Bay motif
+- Keeps red Use My Location button and blue Submit a Coldie button
+- Keeps 35°F standard tagline with COLDIE! in blue
+- Preserves all live Supabase / Leaflet functionality from v3.5
 
-Deploy by replacing these four files in GitHub:
+Deploy by replacing:
 - index.html
 - styles.css
 - app.js
 - README.md
-
-Vercel should redeploy automatically after commit.
