@@ -1,14 +1,10 @@
-# SBSC Website v3.7
+# SBSC Website v3.8
 
-Changes:
-- Rebuilt the chalice into a fuller beer-glass style logo with foam, handle, beer fill, and blue mountain artwork inside.
-- Rebuilt the hero art with a cleaner mountain-to-beach illustration.
-- Kept the shorter hero, one-line desktop title, live stats, and all Supabase/map behavior.
-- Keeps red "Use My Location" button and blue "Submit a Coldie" button.
-- Keeps the tagline styling with blue `COLDIE!`.
-
-Deploy by replacing:
-- index.html
-- styles.css
-- app.js
-- README.md
+Hero-only cleanup pass:
+- Rebuilt mountain-to-beach art as one coherent landscape.
+- Removed the red line that crossed the branding.
+- Reduced palm clutter to two cleaner palms.
+- Added coastal foothills to smooth the mountain → beach transition.
+- Enlarged and simplified the chalice.
+- Chalice now reads clearly as a full beer glass with foam, blue mountains, and red SBSC.
+- Kept one-line desktop title, button colors, short banner, filters, map, stats, and live Supabase behavior unchanged.
