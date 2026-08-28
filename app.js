@@ -282,7 +282,7 @@ function useLocation() {
     els.status.textContent = "Location services are not supported in this browser.";
     return;
   }
-  els.locate.textContent = "Locating…";
+  els.locate.textContent = "📍 Locating…";
   navigator.geolocation.getCurrentPosition(position => {
     userPosition = {
       lat: position.coords.latitude,
@@ -297,11 +297,11 @@ function useLocation() {
       fillOpacity: 1
     }).addTo(map).bindPopup("You are here");
     map.setView([userPosition.lat, userPosition.lng], 12);
-    els.locate.textContent = "Location On";
+    els.locate.textContent = "📍 Location On";
     els.sort.value = "nearest";
     render();
   }, () => {
-    els.locate.textContent = "Use My Location";
+    els.locate.textContent = "📍 Use My Location";
     els.status.textContent = "Location access was denied.";
   });
 }

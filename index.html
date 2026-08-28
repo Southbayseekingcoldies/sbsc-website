@@ -23,32 +23,13 @@
         </div>
       </div>
       <div class="hero-actions">
-        <button id="locate" class="btn btn-primary">Use My Location</button>
-        <button id="submit" class="btn btn-secondary">Submit a Coldie</button>
+        <button id="locate" class="btn btn-primary">📍 Use My Location</button>
+        <button id="submit" class="btn btn-secondary">🍺 Submit a Coldie</button>
       </div>
     </div>
   </header>
 
   <main class="container">
-    <section class="stats-grid" id="statsGrid">
-      <article class="stat-card">
-        <div class="stat-label">Average Draft Temp</div>
-        <div class="stat-value" id="avgTemp">--</div>
-      </article>
-      <article class="stat-card">
-        <div class="stat-label">Passing Rate</div>
-        <div class="stat-value" id="passRate">--</div>
-      </article>
-      <article class="stat-card">
-        <div class="stat-label">Coldest Pour</div>
-        <div class="stat-value" id="coldestPour">--</div>
-      </article>
-      <article class="stat-card">
-        <div class="stat-label">Worst Offender</div>
-        <div class="stat-value" id="worstOffender">--</div>
-      </article>
-    </section>
-
     <section class="controls-panel">
       <label>
         <span>Sort</span>
@@ -85,6 +66,25 @@
       </div>
     </section>
 
+    <section class="stats-grid map-stats" id="statsGrid">
+      <article class="stat-card">
+        <div class="stat-label">Average Draft Temp</div>
+        <div class="stat-value" id="avgTemp">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Passing Rate</div>
+        <div class="stat-value" id="passRate">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Coldest Pour</div>
+        <div class="stat-value" id="coldestPour">--</div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Worst Offender</div>
+        <div class="stat-value" id="worstOffender">--</div>
+      </article>
+    </section>
+
     <section class="results-head">
       <div>
         <h2>Verified Readings</h2>
@@ -102,7 +102,7 @@
     <form id="form" method="dialog" class="submit-form">
       <div class="dialog-head">
         <div>
-          <h3>Submit a Coldie</h3>
+          <h3>🍺 Submit a Coldie</h3>
           <p>Thermometer photo required for verification.</p>
         </div>
         <button id="close" type="button" class="ghost-x">✕</button>

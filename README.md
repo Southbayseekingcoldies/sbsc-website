@@ -25,3 +25,11 @@ V3 adds the stronger SBSC visual identity and live mission framing:
 - Public submission form is still placeholder-only
 - Data source remains Supabase
 - Uses approved readings only
+
+
+## V3.1 tweaks
+- Moved live stats to the bottom below map/results.
+- Restored 📍 and 🍺 button icons.
+- Strengthened the original Rocky Mountain beer-brand visual with icy silver/blue mountains and red accents while keeping the artwork original.
+
+V3.2 layout tweak: stats now sit directly below the map and above Verified Readings.
