@@ -222,28 +222,46 @@ async function locateSubmission(r) {
   btn.disabled = true;
   status.textContent = "Finding address…";
 
+  const searches = [
+    `${r.address}, ${r.city}, ${r.state || "CA"}, USA`,
+    `${r.address}, ${r.city}, USA`,
+    `${r.bar_name}, ${r.city}, ${r.state || "CA"}, USA`
+  ];
+
   try {
-    const q = encodeURIComponent(
-      `${r.address}, ${r.city}, ${r.state || "CA"}, USA`
-    );
+    let result = null;
 
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q=${q}`,
-      { headers: { "Accept":"application/json" } }
-    );
+    for (const search of searches) {
+      const params = new URLSearchParams({
+        format: "jsonv2",
+        limit: "1",
+        countrycodes: "us",
+        addressdetails: "1",
+        q: search
+      });
 
-    if (!response.ok) {
-      throw new Error(`Geocoder returned ${response.status}`);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`
+      );
+
+      if (!response.ok) continue;
+
+      const found = await response.json();
+
+      if (found && found.length) {
+        result = found[0];
+        break;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1100));
     }
 
-    const found = await response.json();
-
-    if (!found.length) {
+    if (!result) {
       throw new Error("Address not found");
     }
 
-    const lat = Number(found[0].lat);
-    const lng = Number(found[0].lon);
+    const lat = Number(result.lat);
+    const lng = Number(result.lon);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       throw new Error("Invalid coordinates");
@@ -252,14 +270,14 @@ async function locateSubmission(r) {
     geocodes.set(r.id, { lat, lng });
 
     status.textContent =
-      `Found: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      `Found: ${result.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}`;
 
     approve.disabled = false;
     btn.textContent = "↻ Recheck";
 
   } catch (err) {
-    status.textContent = `Could not locate: ${err.message}`;
-
+    status.textContent =
+      `Could not locate automatically: ${err.message}`;
   } finally {
     btn.disabled = false;
   }
