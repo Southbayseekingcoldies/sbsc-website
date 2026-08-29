@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SBSC — South Bay Seeking Coldies</title>
+  <meta name="description" content="South Bay Seeking Coldies — verified draft beer temperature readings across the South Bay." />
+  <link rel="canonical" href="https://southbaycoldies.com/" />
+  <meta name="theme-color" content="#d71920" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://southbaycoldies.com/" />
+  <meta property="og:title" content="South Bay Seeking Coldies" />
+  <meta property="og:description" content="Verified cold draft beer across the South Bay. Thermometer or it didn’t happen." />
+  <meta property="og:image" content="https://southbaycoldies.com/social-preview.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="South Bay Seeking Coldies — verified cold draft beer across the South Bay" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="South Bay Seeking Coldies" />
+  <meta name="twitter:description" content="Verified cold draft beer across the South Bay. Thermometer or it didn’t happen." />
+  <meta name="twitter:image" content="https://southbaycoldies.com/social-preview.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero" aria-label="South Bay Seeking Coldies — Verified cold draft beer. Thermometer or it didn’t happen. 35°F or below. That’s a Coldie!">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <h1 class="sr-only">South Bay Seeking Coldies</h1>
+    <div class="hero-actions">
+      <button id="locate" class="hero-btn hero-btn-red">📍 Find a Coldie</button>
+      <button id="submit" class="hero-btn hero-btn-blue">🍺 Submit a Coldie</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="controls-panel">
+      <label><span>Sort</span><select id="sort"><option value="coldest">Coldest first</option><option value="nearest">Nearest first</option><option value="recent">Newest reading</option><option value="warmest">Warmest first</option></select></label>
+      <label><span>Max temp</span><select id="temp"><option value="999" selected>Any verified temp</option><option value="35">35°F or colder</option><option value="32">32°F or colder</option><option value="30">30°F or colder</option></select></label>
+      <label><span>City</span><select id="city"><option value="all">All South Bay</option></select></label>
+    </section>
+
+    <section class="map-shell">
+      <div id="map"></div>
+      <div class="legend"><span><i class="dot elite"></i> ≤30°F Elite</span><span><i class="dot pass"></i> 31–35°F Coldie</span><span><i class="dot fail"></i> 36°F+ Fail</span></div>
+    </section>
+
+    <section class="stats-grid" id="statsGrid">
+      <article class="stat-card stat-blue"><div class="stat-icon">🌡️</div><div><div class="stat-value" id="avgTemp">--</div><div class="stat-label">Average Draft Temp</div></div></article>
+      <article class="stat-card stat-green"><div class="stat-icon">✓</div><div><div class="stat-value" id="passRate">--</div><div class="stat-label">Passing Rate <small>(35°F or below)</small></div></div></article>
+      <article class="stat-card stat-blue"><div class="stat-icon">❄️</div><div><div class="stat-value" id="coldestPour">--</div><div class="stat-label">Coldest Pour</div></div></article>
+      <article class="stat-card stat-red"><div class="stat-icon">!</div><div><div class="stat-value" id="worstOffender">--</div><div class="stat-label">Worst Offender</div></div></article>
+    </section>
+
+    <section class="results-head">
+      <div class="results-title"><span class="verified-mark">✓</span><div><h2>Verified Readings</h2><p id="status">Loading live SBSC readings…</p></div></div>
+      <div class="badge" id="count">0 results</div>
+    </section>
+    <section id="cards" class="cards"></section>
+  </main>
+
+  <dialog id="dialog">
+    <form id="form" class="submit-form">
+      <div class="dialog-head">
+        <div><h3>Submit a Coldie</h3><p>Every reading is reviewed before it appears on the map.</p></div>
+        <button id="close" type="button" class="ghost-x" aria-label="Close submission form">✕</button>
+      </div>
+
+      <div id="submissionFields">
+        <label class="venue-field">
+          <span>📍 Where are you drinking?</span>
+          <div class="venue-input-row">
+            <input id="venueSearch" type="text" placeholder="Finding bars near you…" autocomplete="off" autocapitalize="words" />
+            <button id="refreshVenues" type="button" class="venue-nearby-btn" hidden>Nearby</button>
+          </div>
+          <div id="venueStatus" class="venue-status" hidden></div>
+          <div id="venueResults" class="venue-results" role="listbox" aria-label="Nearby bars and restaurants"></div>
+        </label>
+
+        <div class="form-row quick-row">
+          <label>
+            <span>Temperature °F</span>
+            <input id="temperatureF" name="temperature_f" type="number" inputmode="numeric" min="20" max="80" step="1" placeholder="34" required />
+            <small class="field-help">Round to the nearest whole number.</small>
+          </label>
+          <label>
+            <span>Beer type</span>
+            <select id="beerName" name="beer_name" required>
+              <option value="" selected disabled>Choose one</option>
+              <option value="Light / Crisp">Light / Crisp</option>
+              <option value="Ale / IPA">Ale / IPA</option>
+              <option value="Dark / Malty">Dark / Malty</option>
+              <option value="Other / Not sure">Other / Not sure</option>
+            </select>
+          </label>
+        </div>
+
+        <label><span>Thermometer photo <strong>required</strong></span><input id="photo" name="photo" type="file" accept="image/*" required /></label>
+        <p class="photo-help">Photo should clearly show the beer and thermometer reading. Maximum 10 MB.</p>
+
+        <label>
+          <span>Instagram handle <em>optional</em></span>
+          <input id="instagram" name="submitter_instagram" type="text" maxlength="80" placeholder="@yourhandle" autocapitalize="none" list="instagramSuggestions" />
+          <datalist id="instagramSuggestions"></datalist>
+        </label>
+
+        <label><span>Notes <em>optional</em></span><textarea id="notes" name="notes" maxlength="500" rows="2" placeholder="Anything useful about the pour?"></textarea></label>
+
+        <!-- Venue details are populated automatically after the user selects a nearby place. -->
+        <input id="barName" name="bar_name" type="hidden" />
+        <input id="barAddress" name="address" type="hidden" />
+        <input id="barCity" name="city" type="hidden" />
+        <input id="barState" name="state" type="hidden" value="CA" />
+        <input id="measuredAt" name="measured_at" type="hidden" />
+        <input id="websiteField" name="website" type="text" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
+
+        <div id="submitMessage" class="submit-message" role="status" aria-live="polite"></div>
+        <button id="submitReading" type="submit" class="hero-btn hero-btn-blue full">Submit for Verification</button>
+        <p class="small-note">Submitting does not publish the reading. SBSC reviews the thermometer evidence first.</p>
+      </div>
+
+      <div id="submissionSuccess" class="submission-success" hidden>
+        <div class="success-icon">✓</div>
+        <h3>Submitted for verification.</h3>
+        <p>We’ll add it to the map once the thermometer evidence checks out. 🍺</p>
+        <button id="doneSubmission" type="button" class="hero-btn hero-btn-blue full">Done</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="site-footer">SBSC · South Bay Seeking Coldies</footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
