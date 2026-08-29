@@ -617,6 +617,15 @@ async function submitColdie(event) {
     return;
   }
 
+  const venueLat = Number(selectedVenue.lat);
+  const venueLng = Number(selectedVenue.lng);
+  if (!Number.isFinite(venueLat) || !Number.isFinite(venueLng) ||
+      venueLat < -90 || venueLat > 90 || venueLng < -180 || venueLng > 180) {
+    showSubmitMessage("That venue is missing map coordinates. Please choose it again from the suggestions.");
+    els.venueSearch.focus();
+    return;
+  }
+
   const photo = els.photo.files && els.photo.files[0];
   if (!photo) {
     showSubmitMessage("Please add a thermometer photo.");
@@ -683,6 +692,8 @@ async function submitColdie(event) {
     address: els.barAddress.value.trim(),
     city: els.barCity.value.trim(),
     state: "CA",
+    latitude: venueLat,
+    longitude: venueLng,
     beer_name: els.beerName.value.trim(),
     temperature_f: temp,
     measured_at: measuredDate.toISOString(),
