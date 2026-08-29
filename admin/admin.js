@@ -63,7 +63,7 @@ async function signedPhoto(path) {
 async function loadQueue() {
   el.queue.innerHTML = '<div class="empty">Loading pending submissions…</div>';
   const { data, error } = await client.from("submissions")
-    .select("id,bar_name,address,city,state,beer_name,temperature_f,measured_at,photo_path,submitter_instagram,notes,status,created_at")
+    .select("id,bar_name,address,city,state,latitude,longitude,beer_name,temperature_f,measured_at,photo_path,submitter_instagram,notes,status,created_at")
     .eq("status","pending").order("created_at",{ascending:false});
   if (error) { el.queue.innerHTML=`<div class="empty">Could not load queue: ${escapeHtml(error.message)}</div>`; return; }
   const rows=data||[]; el.pendingCount.textContent=rows.length;
@@ -71,6 +71,13 @@ async function loadQueue() {
   const photoUrls=await Promise.all(rows.map(r=>signedPhoto(r.photo_path)));
   el.queue.innerHTML=rows.map((r,i)=>cardHtml(r,photoUrls[i])).join("");
   rows.forEach(r=>wireCard(r));
+}
+
+function hasStoredCoords(r) {
+  const lat = Number(r.latitude);
+  const lng = Number(r.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) &&
+         lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
 function cardHtml(r,photoUrl) {
@@ -90,24 +97,29 @@ function cardHtml(r,photoUrl) {
         <label class="wide">Notes<textarea id="notes-${r.id}">${escapeHtml(r.notes||'')}</textarea></label>
       </div>
       ${r.submitter_instagram?`<div class="meta">Submitted by ${escapeHtml(r.submitter_instagram)}</div>`:""}
-      <div class="section-title">Location</div>
-      <div class="location-row"><button class="secondary" id="locate-${r.id}">📍 Locate bar</button><div class="location-status" id="location-${r.id}">Locate automatically or enter coordinates below.</div></div>
-      <div class="manual-grid"><label>Latitude<input id="lat-${r.id}" type="number" inputmode="decimal" step="any" placeholder="33.739…" /></label><label>Longitude<input id="lng-${r.id}" type="number" inputmode="decimal" step="any" placeholder="-118.29…" /></label></div>
-      <div class="manual-actions"><button class="secondary" id="manual-${r.id}">Use manual coordinates</button><span class="hint">Useful if address search fails.</span></div>
+      <div class="meta" id="coordstatus-${r.id}" hidden></div>
       <div class="reject-box" id="rejectbox-${r.id}" hidden>
         <label>Reject reason<select id="reason-${r.id}"><option value="Unreadable thermometer">Unreadable thermometer</option><option value="No thermometer visible">No thermometer visible</option><option value="Submitted temperature does not match photo">Temperature doesn't match photo</option><option value="Duplicate submission">Duplicate submission</option><option value="Wrong location">Wrong location</option><option value="Other">Other</option></select></label>
         <label>Optional detail<textarea id="rejectnotes-${r.id}" placeholder="Add details if useful"></textarea></label>
       </div>
-      <div class="actions"><button class="danger" id="reject-${r.id}">Reject</button><button class="approve" id="approve-${r.id}" disabled>Approve</button></div>
+      <div class="actions"><button class="danger" id="reject-${r.id}">Reject</button><button class="approve" id="approve-${r.id}" ${hasStoredCoords(r)?"":"disabled"}>Approve</button></div>
     </div></article>`;
 }
 
 function wireCard(r) {
-  document.getElementById(`locate-${r.id}`).addEventListener("click",()=>locateSubmission(r));
-  document.getElementById(`manual-${r.id}`).addEventListener("click",()=>useManualCoords(r));
   document.getElementById(`approve-${r.id}`).addEventListener("click",()=>approveSubmission(r));
   document.getElementById(`reject-${r.id}`).addEventListener("click",()=>toggleOrReject(r));
+
+  if (hasStoredCoords(r)) {
+    geocodes.set(r.id,{lat:Number(r.latitude),lng:Number(r.longitude)});
+  } else {
+    // Legacy submission from before venue coordinates were stored:
+    // resolve it automatically in the background instead of asking the admin
+    // to perform a second location check.
+    locateLegacySubmission(r);
+  }
 }
+
 function edited(r) {
   return {
     bar_name:document.getElementById(`bar-${r.id}`).value.trim(), address:document.getElementById(`address-${r.id}`).value.trim(),
@@ -116,33 +128,43 @@ function edited(r) {
     measured_at:document.getElementById(`when-${r.id}`).value, notes:document.getElementById(`notes-${r.id}`).value.trim()||null
   };
 }
-function setCoords(r,lat,lng,label) {
-  geocodes.set(r.id,{lat,lng}); document.getElementById(`lat-${r.id}`).value=lat; document.getElementById(`lng-${r.id}`).value=lng;
-  const s=document.getElementById(`location-${r.id}`); s.textContent=label||`Ready: ${lat.toFixed(5)}, ${lng.toFixed(5)}`; s.classList.add("approval-ready"); document.getElementById(`approve-${r.id}`).disabled=false;
-}
 
-async function locateSubmission(r) {
-  const status=document.getElementById(`location-${r.id}`), btn=document.getElementById(`locate-${r.id}`); btn.disabled=true; status.classList.remove("approval-ready"); status.textContent="Finding address…";
-  const e=edited(r); const searches=[`${e.address}, ${e.city}, ${e.state}, USA`,`${e.address}, ${e.city}, USA`,`${e.bar_name}, ${e.city}, ${e.state}, USA`];
+async function locateLegacySubmission(r) {
+  const e=edited(r);
+  const searches=[
+    `${e.address}, ${e.city}, ${e.state}, USA`,
+    `${e.address}, ${e.city}, USA`,
+    `${e.bar_name}, ${e.city}, ${e.state}, USA`
+  ];
+
   try {
     let result=null;
     for (const search of searches) {
       const params=new URLSearchParams({format:"jsonv2",limit:"1",countrycodes:"us",addressdetails:"1",q:search});
       const response=await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`,{headers:{Accept:"application/json"}});
-      if (response.ok) { const found=await response.json(); if (found&&found.length){result=found[0];break;} }
+      if (response.ok) {
+        const found=await response.json();
+        if (found&&found.length){result=found[0];break;}
+      }
       await new Promise(resolve=>setTimeout(resolve,1100));
     }
+
     if(!result) throw new Error("Address not found");
-    const lat=Number(result.lat),lng=Number(result.lon); if(!Number.isFinite(lat)||!Number.isFinite(lng)) throw new Error("Invalid coordinates");
-    setCoords(r,lat,lng,`Found: ${result.display_name||`${lat.toFixed(5)}, ${lng.toFixed(5)}`}`); btn.textContent="↻ Recheck";
-  } catch(err) { status.textContent=`Could not locate automatically: ${err.message}. Enter coordinates below.`; }
-  finally { btn.disabled=false; }
+
+    const lat=Number(result.lat),lng=Number(result.lon);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng)) throw new Error("Invalid coordinates");
+
+    geocodes.set(r.id,{lat,lng});
+    document.getElementById(`approve-${r.id}`).disabled=false;
+  } catch(err) {
+    const status=document.getElementById(`coordstatus-${r.id}`);
+    status.hidden=false;
+    status.textContent="Could not verify this older submission's venue automatically. Check the address and refresh.";
+    status.style.color="#b42318";
+    status.style.fontWeight="800";
+  }
 }
-function useManualCoords(r) {
-  const lat=Number(document.getElementById(`lat-${r.id}`).value),lng=Number(document.getElementById(`lng-${r.id}`).value),status=document.getElementById(`location-${r.id}`);
-  if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat<-90||lat>90||lng<-180||lng>180){status.classList.remove("approval-ready");status.textContent="Enter valid latitude and longitude first.";return;}
-  setCoords(r,lat,lng,`Manual coordinates ready: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-}
+
 async function approveSubmission(r) {
   const coords=geocodes.get(r.id),e=edited(r); if(!coords)return;
   if(!e.bar_name||!e.address||!e.city||!e.beer_name||!e.measured_at||!Number.isInteger(e.temperature_f)||e.temperature_f<20||e.temperature_f>80){alert("Check the review fields. Bar, address, city, beer, date/time and a whole-number temperature from 20–80°F are required.");return;}
