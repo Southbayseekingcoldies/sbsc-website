@@ -75,22 +75,51 @@
       </div>
 
       <div id="submissionFields">
-        <label><span>Bar / restaurant name</span><input id="barName" name="bar_name" type="text" maxlength="120" autocomplete="organization" required /></label>
-        <label><span>Street address</span><input id="barAddress" name="address" type="text" maxlength="180" autocomplete="street-address" placeholder="1101 S Pacific Ave" required /></label>
-        <div class="form-row">
-          <label><span>City</span><input id="barCity" name="city" type="text" maxlength="80" autocomplete="address-level2" required /></label>
-          <label class="state-field"><span>State</span><input id="barState" name="state" type="text" value="CA" readonly /></label>
+        <label class="venue-field">
+          <span>📍 Where are you drinking?</span>
+          <div class="venue-input-row">
+            <input id="venueSearch" type="text" placeholder="Finding bars near you…" autocomplete="off" autocapitalize="words" />
+            <button id="refreshVenues" type="button" class="venue-nearby-btn">Nearby</button>
+          </div>
+          <div id="venueStatus" class="venue-status">Use your location, then tap the right bar or restaurant.</div>
+          <div id="venueResults" class="venue-results" role="listbox" aria-label="Nearby bars and restaurants"></div>
+        </label>
+
+        <div class="form-row quick-row">
+          <label>
+            <span>Temperature °F</span>
+            <input id="temperatureF" name="temperature_f" type="number" inputmode="numeric" min="20" max="80" step="1" placeholder="34" required />
+            <small class="field-help">Round to the nearest whole number.</small>
+          </label>
+          <label>
+            <span>Beer type</span>
+            <select id="beerName" name="beer_name" required>
+              <option value="" selected disabled>Choose one</option>
+              <option value="Light / Crisp">Light / Crisp</option>
+              <option value="Ale / IPA">Ale / IPA</option>
+              <option value="Dark / Malty">Dark / Malty</option>
+              <option value="Other / Not sure">Other / Not sure</option>
+            </select>
+          </label>
         </div>
-        <div class="form-row">
-          <label><span>Beer</span><input id="beerName" name="beer_name" type="text" maxlength="120" placeholder="Coors Light" required /></label>
-          <label><span>Temperature °F</span><input id="temperatureF" name="temperature_f" type="number" inputmode="numeric" min="20" max="80" step="1" placeholder="34" required /></label>
-        </div>
-        <label><span>Date &amp; time measured</span><input id="measuredAt" name="measured_at" type="datetime-local" required /></label>
+
         <label><span>Thermometer photo <strong>required</strong></span><input id="photo" name="photo" type="file" accept="image/*" required /></label>
         <p class="photo-help">Photo should clearly show the beer and thermometer reading. Maximum 10 MB.</p>
-        <label><span>Instagram handle <em>optional</em></span><input id="instagram" name="submitter_instagram" type="text" maxlength="80" placeholder="@yourhandle" autocapitalize="none" /></label>
-        <label><span>Notes <em>optional</em></span><textarea id="notes" name="notes" maxlength="500" rows="3" placeholder="Anything useful about the pour?"></textarea></label>
 
+        <label>
+          <span>Instagram handle <em>optional</em></span>
+          <input id="instagram" name="submitter_instagram" type="text" maxlength="80" placeholder="@yourhandle" autocapitalize="none" list="instagramSuggestions" />
+          <datalist id="instagramSuggestions"></datalist>
+        </label>
+
+        <label><span>Notes <em>optional</em></span><textarea id="notes" name="notes" maxlength="500" rows="2" placeholder="Anything useful about the pour?"></textarea></label>
+
+        <!-- Venue details are populated automatically after the user selects a nearby place. -->
+        <input id="barName" name="bar_name" type="hidden" />
+        <input id="barAddress" name="address" type="hidden" />
+        <input id="barCity" name="city" type="hidden" />
+        <input id="barState" name="state" type="hidden" value="CA" />
+        <input id="measuredAt" name="measured_at" type="hidden" />
         <input id="websiteField" name="website" type="text" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
 
         <div id="submitMessage" class="submit-message" role="status" aria-live="polite"></div>

@@ -1,25 +1,19 @@
-SBSC Frosty Chalice Media Package
+SBSC V6.0 — Fast submission UX
 
-SOURCE:
-The exact user-supplied frosty SBSC chalice image.
-No generative redesign was used. Only the white background was removed.
-
-UPLOAD TO ROOT OF GITHUB MAIN:
+Replace ONLY these three files in the ROOT of the GitHub main branch:
 - index.html
-- favicon.ico
-- favicon-16x16.png
-- favicon-32x32.png
-- favicon-48x48.png
-- favicon-512.png
-- apple-touch-icon.png
-- android-chrome-192x192.png
-- android-chrome-512x512.png
-- site.webmanifest
-- social-preview.png
+- styles.css
+- app.js
 
-EXTRA BRAND FILES:
-- sbsc-chalice-transparent.png  (tight transparent original-ratio mark)
-- sbsc-symbol-1024.png          (square transparent brand symbol)
-- sbsc-symbol-1080.png          (square transparent social/profile symbol)
+No SQL changes are required. Existing submissions table columns are reused.
 
-All symbol/icon files have transparent backgrounds.
+What changed:
+- One location-first venue field instead of name/address/city/state.
+- Nearby bars/restaurants suggested from device location.
+- Selecting a venue auto-populates hidden bar/address/city/state details.
+- Beer is a simple category dropdown.
+- Temperature explicitly says to round to the nearest whole number.
+- Measurement time is automatically set to now and hidden.
+- Instagram handles are remembered on that device and offered as suggestions later.
+- Public site/map behavior is otherwise preserved.
+- Desktop hero is preserved at 440px; mobile remains 160px.

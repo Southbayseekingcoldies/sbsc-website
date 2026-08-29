@@ -25,6 +25,11 @@ const els = {
   doneSubmission: document.getElementById("doneSubmission"),
   submitReading: document.getElementById("submitReading"),
   submitMessage: document.getElementById("submitMessage"),
+  venueSearch: document.getElementById("venueSearch"),
+  venueResults: document.getElementById("venueResults"),
+  venueStatus: document.getElementById("venueStatus"),
+  refreshVenues: document.getElementById("refreshVenues"),
+  instagramSuggestions: document.getElementById("instagramSuggestions"),
   barName: document.getElementById("barName"),
   barAddress: document.getElementById("barAddress"),
   barCity: document.getElementById("barCity"),
@@ -49,6 +54,9 @@ let filtered = [];
 let markers = [];
 let userPosition = null;
 let userMarker = null;
+let nearbyVenues = [];
+let selectedVenue = null;
+let venueSearchTimer = null;
 
 function roundTemp(value) {
   return Math.round(Number(value));
@@ -327,10 +335,241 @@ function localDateTimeValue(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function stateAbbreviation(value) {
+  if (!value) return "CA";
+  const cleaned = String(value).trim();
+  if (/^california$/i.test(cleaned)) return "CA";
+  if (/^[A-Za-z]{2}$/.test(cleaned)) return cleaned.toUpperCase();
+  return cleaned;
+}
+
+function localityFromAddress(address = {}) {
+  if (address.city === "Los Angeles" && address.suburb) return address.suburb;
+  return address.city || address.town || address.village || address.municipality || address.suburb || address.county || "";
+}
+
+function milesBetween(lat1, lng1, lat2, lng2) {
+  return haversineMiles({ lat: Number(lat1), lng: Number(lng1) }, { lat: Number(lat2), lng: Number(lng2) });
+}
+
+function venueMeta(venue) {
+  const bits = [];
+  if (Number.isFinite(venue.distance)) bits.push(`${venue.distance.toFixed(1)} mi`);
+  if (venue.street) bits.push(venue.street);
+  if (venue.city) bits.push(venue.city);
+  return bits.join(" · ") || "Nearby";
+}
+
+function renderVenueResults(list) {
+  els.venueResults.innerHTML = "";
+  if (!list.length) {
+    els.venueResults.innerHTML = '<div class="venue-empty">No nearby matches yet. Try typing the venue name.</div>';
+    els.venueResults.classList.add("open");
+    return;
+  }
+
+  list.slice(0, 12).forEach(venue => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "venue-option";
+    button.setAttribute("role", "option");
+    button.innerHTML = `<span class="venue-option-name">${escapeHtml(venue.name)}</span><span class="venue-option-meta">${escapeHtml(venueMeta(venue))}</span>`;
+    button.addEventListener("click", () => chooseVenue(venue));
+    els.venueResults.appendChild(button);
+  });
+  els.venueResults.classList.add("open");
+}
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[char]));
+}
+
+async function reverseVenue(lat, lng, fallback = {}) {
+  try {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      lat: String(lat),
+      lon: String(lng),
+      zoom: "18",
+      addressdetails: "1"
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`);
+    if (!response.ok) throw new Error("Reverse geocoder unavailable");
+    const data = await response.json();
+    const address = data.address || {};
+    const street = [address.house_number, address.road || address.pedestrian || address.footway].filter(Boolean).join(" ");
+    return {
+      address: street || fallback.street || data.display_name || fallback.address || "Location selected",
+      city: localityFromAddress(address) || fallback.city || "",
+      state: stateAbbreviation(address.state || fallback.state || "CA")
+    };
+  } catch (error) {
+    return {
+      address: fallback.street || fallback.address || "Location selected",
+      city: fallback.city || "",
+      state: stateAbbreviation(fallback.state || "CA")
+    };
+  }
+}
+
+async function chooseVenue(venue) {
+  els.venueStatus.textContent = "Confirming venue address…";
+  els.venueStatus.classList.remove("selected");
+
+  const details = await reverseVenue(venue.lat, venue.lng, venue);
+  selectedVenue = { ...venue, ...details };
+
+  els.venueSearch.value = selectedVenue.name;
+  els.barName.value = selectedVenue.name;
+  els.barAddress.value = selectedVenue.address;
+  els.barCity.value = selectedVenue.city || "South Bay";
+  els.barState.value = selectedVenue.state || "CA";
+  els.venueResults.classList.remove("open");
+  els.venueStatus.textContent = `✓ ${selectedVenue.address}${selectedVenue.city ? ` · ${selectedVenue.city}` : ""}`;
+  els.venueStatus.classList.add("selected");
+}
+
+async function fetchNearbyVenues(lat, lng) {
+  const query = `[out:json][timeout:18];(node["amenity"~"^(bar|pub|restaurant|biergarten|cafe|nightclub)$"](around:4000,${lat},${lng});way["amenity"~"^(bar|pub|restaurant|biergarten|cafe|nightclub)$"](around:4000,${lat},${lng});relation["amenity"~"^(bar|pub|restaurant|biergarten|cafe|nightclub)$"](around:4000,${lat},${lng}););out center 80;`;
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Nearby venue search is temporarily unavailable.");
+  const data = await response.json();
+
+  const seen = new Set();
+  nearbyVenues = (data.elements || []).map(item => {
+    const tags = item.tags || {};
+    const vlat = Number(item.lat ?? item.center?.lat);
+    const vlng = Number(item.lon ?? item.center?.lon);
+    const name = String(tags.name || "").trim();
+    if (!name || !Number.isFinite(vlat) || !Number.isFinite(vlng)) return null;
+    const key = `${name.toLowerCase()}|${vlat.toFixed(4)}|${vlng.toFixed(4)}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const street = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
+    return {
+      name,
+      lat: vlat,
+      lng: vlng,
+      street,
+      city: tags["addr:city"] || "",
+      state: tags["addr:state"] || "CA",
+      distance: milesBetween(lat, lng, vlat, vlng)
+    };
+  }).filter(Boolean).sort((a,b) => a.distance - b.distance);
+
+  return nearbyVenues;
+}
+
+async function searchVenueByName(term) {
+  const query = term.trim();
+  if (query.length < 2) return;
+
+  const localMatches = nearbyVenues.filter(v => v.name.toLowerCase().includes(query.toLowerCase()));
+  if (localMatches.length) {
+    renderVenueResults(localMatches);
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      q: `${query}, California`,
+      limit: "8",
+      countrycodes: "us",
+      addressdetails: "1",
+      viewbox: "-118.55,34.05,-117.95,33.55"
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    const results = data.map(row => {
+      const a = row.address || {};
+      const city = localityFromAddress(a);
+      return {
+        name: row.name || row.display_name.split(",")[0],
+        lat: Number(row.lat),
+        lng: Number(row.lon),
+        street: [a.house_number, a.road].filter(Boolean).join(" "),
+        city,
+        state: stateAbbreviation(a.state || "CA"),
+        distance: userPosition ? milesBetween(userPosition.lat, userPosition.lng, Number(row.lat), Number(row.lon)) : NaN
+      };
+    }).filter(v => v.name && Number.isFinite(v.lat) && Number.isFinite(v.lng));
+    renderVenueResults(results);
+  } catch (error) {
+    els.venueStatus.textContent = "Could not search that name. Tap Nearby and try again.";
+  }
+}
+
+async function startVenueLookup() {
+  if (!navigator.geolocation) {
+    els.venueStatus.textContent = "Location is unavailable. Start typing the venue name.";
+    els.venueSearch.placeholder = "Type a bar or restaurant";
+    return;
+  }
+
+  els.refreshVenues.disabled = true;
+  els.refreshVenues.textContent = "Locating…";
+  els.venueStatus.textContent = "Finding bars and restaurants near you…";
+
+  navigator.geolocation.getCurrentPosition(async position => {
+    userPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
+    try {
+      const venues = await fetchNearbyVenues(userPosition.lat, userPosition.lng);
+      els.venueSearch.placeholder = "Tap a nearby spot or start typing";
+      els.venueStatus.textContent = venues.length ? "Tap the right place below." : "No nearby places found. Start typing the venue name.";
+      renderVenueResults(venues);
+    } catch (error) {
+      els.venueStatus.textContent = "Nearby search had trouble loading. Start typing the venue name.";
+      els.venueSearch.placeholder = "Type a bar or restaurant";
+    } finally {
+      els.refreshVenues.disabled = false;
+      els.refreshVenues.textContent = "Nearby";
+    }
+  }, () => {
+    els.venueStatus.textContent = "Location access was denied. Start typing the venue name.";
+    els.venueSearch.placeholder = "Type a bar or restaurant";
+    els.refreshVenues.disabled = false;
+    els.refreshVenues.textContent = "Nearby";
+  }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 });
+}
+
+function loadInstagramSuggestions() {
+  let handles = [];
+  try { handles = JSON.parse(localStorage.getItem("sbscInstagramHandles") || "[]"); } catch (_) {}
+  els.instagramSuggestions.innerHTML = "";
+  handles.slice(0, 12).forEach(handle => {
+    const option = document.createElement("option");
+    option.value = handle;
+    els.instagramSuggestions.appendChild(option);
+  });
+}
+
+function rememberInstagramHandle(handle) {
+  if (!handle) return;
+  let handles = [];
+  try { handles = JSON.parse(localStorage.getItem("sbscInstagramHandles") || "[]"); } catch (_) {}
+  handles = [handle, ...handles.filter(item => item.toLowerCase() !== handle.toLowerCase())].slice(0, 12);
+  localStorage.setItem("sbscInstagramHandles", JSON.stringify(handles));
+  loadInstagramSuggestions();
+}
+
 function resetSubmissionForm() {
   els.form.reset();
+  selectedVenue = null;
+  nearbyVenues = [];
   els.barState.value = "CA";
   els.measuredAt.value = localDateTimeValue();
+  els.venueSearch.value = "";
+  els.venueSearch.placeholder = "Finding bars near you…";
+  els.venueResults.innerHTML = "";
+  els.venueResults.classList.remove("open");
+  els.venueStatus.textContent = "Use your location, then tap the right bar or restaurant.";
+  els.venueStatus.classList.remove("selected");
+  loadInstagramSuggestions();
   els.submissionFields.hidden = false;
   els.submissionSuccess.hidden = true;
   els.submitMessage.className = "submit-message";
@@ -371,6 +610,12 @@ async function submitColdie(event) {
   if (els.websiteField.value) return;
 
   if (!els.form.reportValidity()) return;
+
+  if (!selectedVenue || !els.barName.value.trim()) {
+    showSubmitMessage("Choose the bar or restaurant from the venue suggestions first.");
+    els.venueSearch.focus();
+    return;
+  }
 
   const photo = els.photo.files && els.photo.files[0];
   if (!photo) {
@@ -460,6 +705,7 @@ async function submitColdie(event) {
     return;
   }
 
+  if (instagram) rememberInstagramHandle(`@${instagram}`);
   els.submissionFields.hidden = true;
   els.submissionSuccess.hidden = false;
 }
@@ -468,9 +714,36 @@ els.sort.addEventListener("change", render);
 els.temp.addEventListener("change", render);
 els.city.addEventListener("change", render);
 els.locate.addEventListener("click", useLocation);
+els.venueSearch.addEventListener("input", () => {
+  if (selectedVenue && els.venueSearch.value.trim() !== selectedVenue.name) {
+    selectedVenue = null;
+    els.barName.value = "";
+    els.barAddress.value = "";
+    els.barCity.value = "";
+    els.venueStatus.classList.remove("selected");
+    els.venueStatus.textContent = "Choose a venue from the suggestions.";
+  }
+  clearTimeout(venueSearchTimer);
+  const term = els.venueSearch.value.trim();
+  if (!term) {
+    renderVenueResults(nearbyVenues);
+    return;
+  }
+  const localMatches = nearbyVenues.filter(v => v.name.toLowerCase().includes(term.toLowerCase()));
+  if (localMatches.length) renderVenueResults(localMatches);
+  venueSearchTimer = setTimeout(() => searchVenueByName(term), 500);
+});
+
+els.venueSearch.addEventListener("focus", () => {
+  if (nearbyVenues.length && !selectedVenue) renderVenueResults(nearbyVenues);
+});
+
+els.refreshVenues.addEventListener("click", startVenueLookup);
+
 els.submit.addEventListener("click", () => {
   resetSubmissionForm();
   els.dialog.showModal();
+  startVenueLookup();
 });
 els.close.addEventListener("click", () => els.dialog.close());
 els.doneSubmission.addEventListener("click", () => els.dialog.close());
