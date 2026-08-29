@@ -427,7 +427,7 @@ async function chooseVenue(venue) {
   els.barCity.value = selectedVenue.city || "South Bay";
   els.barState.value = selectedVenue.state || "CA";
   els.venueResults.classList.remove("open");
-  els.venueStatus.textContent = `✓ ${selectedVenue.address}${selectedVenue.city ? ` · ${selectedVenue.city}` : ""}`;
+  els.venueStatus.textContent = "";
   els.venueStatus.classList.add("selected");
 }
 
