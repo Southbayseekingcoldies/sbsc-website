@@ -56,6 +56,33 @@ let markers = [];
 let userPosition = null;
 let userMarker = null;
 let nearbyVenues = [];
+
+// Small rescue directory for South Bay venues that are missing or poorly named
+// in OpenStreetMap. Aliases make typo/partial matching work even when the map
+// provider has no usable POI record for the business.
+const CURATED_VENUES = [
+  {
+    name: "Trani's Dockside Station",
+    aliases: ["tranis dockside", "trani dockside", "tranis dockside station", "dockside station"],
+    street: "311 E 22nd St",
+    city: "San Pedro",
+    state: "CA"
+  },
+  {
+    name: "J. Trani's Ristorante",
+    aliases: ["j tranis", "j trani", "tranis ristorante", "trani ristorante", "tranis restaurant", "trani restaurant"],
+    street: "584 W 9th St",
+    city: "San Pedro",
+    state: "CA"
+  },
+  {
+    name: "The Majestic",
+    aliases: ["tranis majestic", "trani majestic", "majestic trani", "majestic tranis"],
+    street: "921 S Beacon St",
+    city: "San Pedro",
+    state: "CA"
+  }
+];
 let selectedVenue = null;
 let venueSearchTimer = null;
 let venueSearchRequest = 0;
@@ -483,6 +510,20 @@ function venueNameScore(query, venueName) {
   return Math.round(Math.max(tokenAverage * 90, whole * 84));
 }
 
+function curatedVenueMatches(query) {
+  const q = normalizeVenueText(query);
+  if (!q) return [];
+
+  return CURATED_VENUES
+    .map(venue => {
+      const names = [venue.name, ...(venue.aliases || [])];
+      const matchScore = Math.max(...names.map(name => venueNameScore(q, name)));
+      return { ...venue, matchScore, curated: true };
+    })
+    .filter(venue => venue.matchScore >= 48)
+    .sort((a, b) => b.matchScore - a.matchScore);
+}
+
 function knownSbscVenues() {
   const seen = new Set();
   return readings.map(r => {
@@ -506,9 +547,11 @@ function venueCandidatePool() {
   const seen = new Set();
   const pool = [];
 
-  [...nearbyVenues, ...knownSbscVenues()].forEach(venue => {
+  [...nearbyVenues, ...knownSbscVenues(), ...CURATED_VENUES].forEach(venue => {
     if (!venue || !venue.name) return;
-    const key = `${normalizeVenueText(venue.name)}|${Number(venue.lat).toFixed(4)}|${Number(venue.lng).toFixed(4)}`;
+    const hasCoords = Number.isFinite(Number(venue.lat)) && Number.isFinite(Number(venue.lng));
+    const coordKey = hasCoords ? `${Number(venue.lat).toFixed(4)}|${Number(venue.lng).toFixed(4)}` : `${venue.street || ""}|${venue.city || ""}`;
+    const key = `${normalizeVenueText(venue.name)}|${coordKey}`;
     if (seen.has(key)) return;
     seen.add(key);
     pool.push(venue);
@@ -523,10 +566,12 @@ function fuzzyVenueMatches(query, limit = 8) {
 
   return venueCandidatePool()
     .map(venue => {
-      const matchScore = venueNameScore(q, venue.name);
+      const aliases = venue.aliases || [];
+      const matchScore = Math.max(venueNameScore(q, venue.name), ...aliases.map(alias => venueNameScore(q, alias)));
+      const hasCoords = Number.isFinite(Number(venue.lat)) && Number.isFinite(Number(venue.lng));
       const distance = Number.isFinite(venue.distance)
         ? venue.distance
-        : (userPosition ? milesBetween(userPosition.lat, userPosition.lng, venue.lat, venue.lng) : NaN);
+        : (userPosition && hasCoords ? milesBetween(userPosition.lat, userPosition.lng, Number(venue.lat), Number(venue.lng)) : NaN);
 
       // Keep location as a tie-breaker, but name similarity is the main signal.
       const distanceBonus = Number.isFinite(distance)
@@ -655,13 +700,58 @@ async function reverseVenue(lat, lng, fallback = {}) {
   }
 }
 
+async function geocodeVenueAddress(venue) {
+  const parts = [venue.street, venue.city, venue.state || "CA", "USA"].filter(Boolean);
+  if (!venue.street || !venue.city) return venue;
+
+  try {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      q: parts.join(", "),
+      limit: "1",
+      countrycodes: "us",
+      addressdetails: "1"
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+    if (!response.ok) throw new Error("Address lookup unavailable");
+    const data = await response.json();
+    const row = data && data[0];
+    const lat = Number(row?.lat);
+    const lng = Number(row?.lon);
+    if (!isSouthBayCoordinate(lat, lng)) throw new Error("Address lookup returned invalid coordinates");
+    return { ...venue, lat, lng };
+  } catch (error) {
+    return venue;
+  }
+}
+
 async function chooseVenue(venue) {
   // Lock the choice immediately so a slower autocomplete request cannot reopen
   // stale suggestions after the user has already picked the right venue.
   venueSearchRequest += 1;
   clearTimeout(venueSearchTimer);
-  selectedVenue = { ...venue };
-  els.venueSearch.value = venue.name;
+
+  let resolvedVenue = { ...venue };
+  const hasCoords = Number.isFinite(Number(resolvedVenue.lat)) && Number.isFinite(Number(resolvedVenue.lng));
+  if (!hasCoords && resolvedVenue.street && resolvedVenue.city) {
+    resolvedVenue = await geocodeVenueAddress(resolvedVenue);
+  }
+
+  // If a curated venue still cannot be geocoded, use live GPS only when the
+  // user is physically there; otherwise don't silently invent a map point.
+  const resolvedHasCoords = Number.isFinite(Number(resolvedVenue.lat)) && Number.isFinite(Number(resolvedVenue.lng));
+  if (!resolvedHasCoords) {
+    if (userPosition && venue.useCurrentLocation) {
+      resolvedVenue.lat = userPosition.lat;
+      resolvedVenue.lng = userPosition.lng;
+    } else {
+      showSubmitMessage("I found the venue name, but couldn't lock its map point. Try Nearby or use your current location.");
+      return;
+    }
+  }
+
+  selectedVenue = { ...resolvedVenue };
+  els.venueSearch.value = resolvedVenue.name;
   setVenueSelectionUI(true);
   closeVenueResults();
   els.venueSearch.blur();
@@ -669,8 +759,8 @@ async function chooseVenue(venue) {
   els.venueStatus.textContent = "Confirming venue address…";
   els.venueStatus.classList.remove("selected");
 
-  const details = await reverseVenue(venue.lat, venue.lng, venue);
-  selectedVenue = { ...venue, ...details };
+  const details = await reverseVenue(resolvedVenue.lat, resolvedVenue.lng, resolvedVenue);
+  selectedVenue = { ...resolvedVenue, ...details };
 
   els.venueSearch.value = selectedVenue.name;
   els.barName.value = selectedVenue.name;
@@ -722,7 +812,19 @@ async function searchVenueByName(term, requestId) {
   // First answer instantly from nearby OSM venues + venues SBSC already knows.
   // This is typo-tolerant: "trannis", "sardinee", "nikos pizza", etc.
   const localMatches = fuzzyVenueMatches(query, 8);
-  if (localMatches.length && requestId === venueSearchRequest && !selectedVenue) renderVenueResults(localMatches);
+  const curatedMatches = curatedVenueMatches(query);
+  const instantMatches = [];
+  const instantSeen = new Set();
+  [...curatedMatches, ...localMatches].forEach(v => {
+    const key = `${normalizeVenueText(v.name)}|${v.street || ""}|${v.city || ""}`;
+    if (instantSeen.has(key)) return;
+    instantSeen.add(key);
+    instantMatches.push(v);
+  });
+  instantMatches.slice(0, 8).forEach((venue, index) => {
+    if (index === 0 && venue.matchScore < 100) venue.matchHint = "Best match";
+  });
+  if (instantMatches.length && requestId === venueSearchRequest && !selectedVenue) renderVenueResults(instantMatches.slice(0, 8));
 
   try {
     const variants = uniqueSearchVariants(query);
@@ -794,15 +896,18 @@ async function searchVenueByName(term, requestId) {
     const combined = [];
     const combinedKeys = new Set();
 
-    [...localMatches, ...remoteResults].forEach(v => {
-      const key = `${normalizeVenueText(v.name)}|${Number(v.lat).toFixed(5)}|${Number(v.lng).toFixed(5)}`;
+    [...curatedMatches, ...localMatches, ...remoteResults].forEach(v => {
+      const hasCoords = Number.isFinite(Number(v.lat)) && Number.isFinite(Number(v.lng));
+      const key = hasCoords
+        ? `${normalizeVenueText(v.name)}|${Number(v.lat).toFixed(5)}|${Number(v.lng).toFixed(5)}`
+        : `${normalizeVenueText(v.name)}|${v.street || ""}|${v.city || ""}`;
       if (combinedKeys.has(key)) return;
       combinedKeys.add(key);
 
       const matchScore = Number.isFinite(v.matchScore) ? v.matchScore : venueNameScore(query, v.name);
       const distance = Number.isFinite(v.distance)
         ? v.distance
-        : (userPosition ? milesBetween(userPosition.lat, userPosition.lng, v.lat, v.lng) : NaN);
+        : (userPosition && hasCoords ? milesBetween(userPosition.lat, userPosition.lng, Number(v.lat), Number(v.lng)) : NaN);
 
       combined.push({
         ...v,

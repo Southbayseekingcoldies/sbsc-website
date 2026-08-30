@@ -1,22 +1,16 @@
-SBSC V6.4 — CONSOLIDATED FILTER + VENUE UX UPDATE
+SBSC V6.4 — venue rescue patch
 
-Replace these THREE root files:
-- index.html
-- styles.css
-- app.js
+Replace ONLY the root app.js.
 
-This app.js includes V6.3 Smart Venue Search and V6.4 Certified Coldies wording.
+What changed:
+- Fixes Trani's Dockside Station and J. Trani's Ristorante not appearing.
+- Adds typo/alias matching for those venues even when OpenStreetMap has no POI record.
+- Curated results show their real street addresses, not just "use my current location".
+- On selection, the exact address is geocoded to a map coordinate.
+- Keeps all existing V6.4 filters, Certified Coldies wording, smart search, and dropdown cleanup.
+- Current-location fallback remains for genuinely unknown venues.
 
-Changes in this consolidated V6.4:
-- MAX TEMP becomes RESULTS
-- Results options: All verified readings / All certified Coldies ✅ / All verified fails ❌
-- Venue suggestion dropdown is visually cleaned up
-- Venue selection gets a subtle green check state
-- Suggestions close immediately after selection
-- Slow/stale search requests cannot reopen suggestions after a venue is selected
-- Clicking outside or pressing Escape closes suggestions
-- Typing again cleanly changes the selected venue
-- Fixed the malformed V6.0 venue CSS append that contained literal \n characters
-- Preserves 440px desktop hero and 160px mobile hero
-
-No SQL or admin files are needed for this update.
+Known rescue entries included:
+- Trani's Dockside Station — 311 E 22nd St, San Pedro
+- J. Trani's Ristorante — 584 W 9th St, San Pedro
+- The Majestic — 921 S Beacon St, San Pedro (Trani-family alias search)
