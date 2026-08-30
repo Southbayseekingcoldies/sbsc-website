@@ -1,16 +1,15 @@
-SBSC V6.4 — venue rescue patch
+SBSC V6.4 — GOLD SUBMIT + CITY BELOW MAP
 
-Replace ONLY the root app.js.
+Replace ONLY:
+- index.html
+- styles.css
 
-What changed:
-- Fixes Trani's Dockside Station and J. Trani's Ristorante not appearing.
-- Adds typo/alias matching for those venues even when OpenStreetMap has no POI record.
-- Curated results show their real street addresses, not just "use my current location".
-- On selection, the exact address is geocoded to a map coordinate.
-- Keeps all existing V6.4 filters, Certified Coldies wording, smart search, and dropdown cleanup.
-- Current-location fallback remains for genuinely unknown venues.
+Do NOT replace app.js — it is unchanged.
 
-Known rescue entries included:
-- Trani's Dockside Station — 311 E 22nd St, San Pedro
-- J. Trani's Ristorante — 584 W 9th St, San Pedro
-- The Majestic — 921 S Beacon St, San Pedro (Trani-family alias search)
+Changes:
+- Hero 'Submit a Coldie' button changes from blue to beer-gold/yellow with dark navy text.
+- Button size, position, and hero height are unchanged.
+- City filter is removed from the top filter card.
+- City filter is moved directly below the map/legend.
+- Sort + Results remain above the map.
+- All V6.4 functionality is preserved.

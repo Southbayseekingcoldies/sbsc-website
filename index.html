@@ -37,7 +37,7 @@
     <h1 class="sr-only">South Bay Seeking Coldies</h1>
     <div class="hero-actions">
       <button id="locate" class="hero-btn hero-btn-red">📍 Find a Coldie</button>
-      <button id="submit" class="hero-btn hero-btn-blue">🍺 Submit a Coldie</button>
+      <button id="submit" class="hero-btn hero-btn-gold">🍺 Submit a Coldie</button>
     </div>
   </header>
 
@@ -45,12 +45,15 @@
     <section class="controls-panel">
       <label><span>Sort</span><select id="sort"><option value="coldest">Coldest first</option><option value="nearest">Nearest first</option><option value="recent">Newest reading</option><option value="warmest">Warmest first</option></select></label>
       <label><span>Results</span><select id="temp"><option value="all" selected>All verified readings</option><option value="coldies">All certified Coldies ✅</option><option value="fails">All verified fails ❌</option></select></label>
-      <label><span>City</span><select id="city"><option value="all">All South Bay</option></select></label>
     </section>
 
     <section class="map-shell">
       <div id="map"></div>
       <div class="legend"><span><i class="dot elite"></i> ≤30°F Elite</span><span><i class="dot pass"></i> 31–35°F Coldie</span><span><i class="dot fail"></i> 36°F+ Fail</span></div>
+    </section>
+
+    <section class="city-filter-panel">
+      <label><span>City</span><select id="city"><option value="all">All South Bay</option></select></label>
     </section>
 
     <section class="stats-grid" id="statsGrid">
