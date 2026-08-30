@@ -1,13 +1,9 @@
-SBSC V6.4 — DESKTOP BIGGER HERO BUTTONS
+SBSC V6.4 — CITY FILTER ABOVE VERIFIED READINGS
 
 Replace ONLY:
-- styles.css
+- index.html
 
-Mobile button size is unchanged.
-
-Desktop-only changes:
-- Larger hero buttons
-- Slightly larger gap
-- Larger tap/click target
-- Same red Find button and gold Submit button
-- No other layout changes
+Change:
+- Moves the City filter from below the map to immediately above the Verified Readings list.
+- Stats remain directly below the map.
+- No CSS or JavaScript changes.
