@@ -1,19 +1,22 @@
-SBSC V6.0 — Fast submission UX
+SBSC V6.2 — MAP FIX
 
-Replace ONLY these three files in the ROOT of the GitHub main branch:
-- index.html
-- styles.css
-- app.js
+Do this in order:
 
-No SQL changes are required. Existing submissions table columns are reused.
+1. Supabase SQL Editor
+   Run: supabase-v6-2-map-fix.sql
 
-What changed:
-- One location-first venue field instead of name/address/city/state.
-- Nearby bars/restaurants suggested from device location.
-- Selecting a venue auto-populates hidden bar/address/city/state details.
-- Beer is a simple category dropdown.
-- Temperature explicitly says to round to the nearest whole number.
-- Measurement time is automatically set to now and hidden.
-- Instagram handles are remembered on that device and offered as suggestions later.
-- Public site/map behavior is otherwise preserved.
-- Desktop hero is preserved at 440px; mobile remains 160px.
+2. GitHub root
+   Replace: app.js
+
+3. GitHub admin folder
+   Replace: admin/admin.js
+
+Do NOT replace index.html, CSS, favicon files, or any artwork.
+
+What this fixes:
+- Repairs Niko's 0,0 / Africa pin.
+- Corrects The Sardine and The Basque Club Taberna existing pins.
+- Fixes the null-coordinate bug permanently.
+- Rejects impossible/out-of-South-Bay coordinates.
+- Keeps later approvals from moving an already-established bar pin.
+- Refreshes the public readings automatically when you return to the site after approving a submission.

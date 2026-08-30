@@ -62,6 +62,12 @@ function roundTemp(value) {
   return Math.round(Number(value));
 }
 
+function isSouthBayCoordinate(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= 33.55 && lat <= 34.10 &&
+    lng >= -118.75 && lng <= -117.90;
+}
+
 function formatTemp(value) {
   return `${roundTemp(value)}°F`;
 }
@@ -174,7 +180,7 @@ async function loadReadings() {
       measuredAt: row.measured_at,
       notes: row.notes || ""
     };
-  }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng) && Number.isFinite(item.temp));
+  }).filter(item => isSouthBayCoordinate(item.lat, item.lng) && Number.isFinite(item.temp));
 
   rebuildCityOptions();
   render();
@@ -619,9 +625,8 @@ async function submitColdie(event) {
 
   const venueLat = Number(selectedVenue.lat);
   const venueLng = Number(selectedVenue.lng);
-  if (!Number.isFinite(venueLat) || !Number.isFinite(venueLng) ||
-      venueLat < -90 || venueLat > 90 || venueLng < -180 || venueLng > 180) {
-    showSubmitMessage("That venue is missing map coordinates. Please choose it again from the suggestions.");
+  if (!isSouthBayCoordinate(venueLat, venueLng)) {
+    showSubmitMessage("That venue is missing a valid South Bay map location. Please choose it again from the suggestions.");
     els.venueSearch.focus();
     return;
   }
@@ -763,4 +768,18 @@ els.dialog.addEventListener("click", event => {
   if (event.target === els.dialog) els.dialog.close();
 });
 
-loadReadings();
+
+let lastReadingsRefresh = 0;
+async function refreshReadingsIfNeeded(force = false) {
+  const now = Date.now();
+  if (!force && now - lastReadingsRefresh < 3000) return;
+  lastReadingsRefresh = now;
+  await loadReadings();
+}
+
+window.addEventListener("focus", () => refreshReadingsIfNeeded());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshReadingsIfNeeded();
+});
+
+refreshReadingsIfNeeded(true);
