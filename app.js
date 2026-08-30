@@ -26,6 +26,7 @@ const els = {
   submitReading: document.getElementById("submitReading"),
   submitMessage: document.getElementById("submitMessage"),
   venueSearch: document.getElementById("venueSearch"),
+  venueField: document.querySelector(".venue-field"),
   venueResults: document.getElementById("venueResults"),
   venueStatus: document.getElementById("venueStatus"),
   refreshVenues: document.getElementById("refreshVenues"),
@@ -57,6 +58,7 @@ let userMarker = null;
 let nearbyVenues = [];
 let selectedVenue = null;
 let venueSearchTimer = null;
+let venueSearchRequest = 0;
 
 function roundTemp(value) {
   return Math.round(Number(value));
@@ -89,6 +91,17 @@ function getStatus(temp) {
   if (t <= 30) return { tier: "elite", label: "PASS", message: `${Math.abs(PASS_STANDARD - t)}° below standard` };
   if (t <= PASS_STANDARD) return { tier: "pass", label: "PASS", message: `${Math.abs(PASS_STANDARD - t)}° ${t === PASS_STANDARD ? "at standard" : "below standard"}` };
   return { tier: "fail", label: "FAIL", message: `${t - PASS_STANDARD}° over standard` };
+}
+
+function displayJudgment(status, surface = "card") {
+  if (status.tier === "fail") {
+    return `${status.label} · ${status.message.toUpperCase()}`;
+  }
+
+  // Successful pours get the SBSC hype treatment.
+  return surface === "map"
+    ? "CERTIFIED COLDIES ✅"
+    : "CERTIFIED COLDIES ✅🌡️❄️";
 }
 
 function haversineMiles(a, b) {
@@ -208,11 +221,15 @@ function updateStats(sourceList) {
 }
 
 function currentList() {
-  const maxTemp = Number(els.temp.value);
+  const resultType = els.temp.value;
   const city = els.city.value;
 
   let list = readings
-    .filter(r => r.temp <= maxTemp)
+    .filter(r => {
+      if (resultType === "coldies") return r.temp <= PASS_STANDARD;
+      if (resultType === "fails") return r.temp > PASS_STANDARD;
+      return true;
+    })
     .filter(r => city === "all" ? true : r.city === city)
     .map(r => ({
       ...r,
@@ -272,7 +289,7 @@ function render() {
       <div>${reading.city}, ${reading.state}</div>
       <div>${reading.beer}</div>
       <div class="popup-temp">${formatTemp(reading.temp)}</div>
-      <div class="popup-judgment">${reading.status.label} · ${reading.status.message.toUpperCase()}</div>
+      <div class="popup-judgment">${displayJudgment(reading.status, "map")}</div>
     `;
     const marker = L.marker([reading.lat, reading.lng], { icon: makeMarkerIcon(reading.status) }).addTo(map);
     marker.bindPopup(popup);
@@ -294,7 +311,7 @@ function render() {
       <div class="time-line"><strong>Measured:</strong> ${formatDate(reading.measuredAt)}</div>
       ${reading.distance != null ? `<div class="time-line"><strong>Distance:</strong> ${reading.distance.toFixed(1)} mi</div>` : ""}
       <div class="status-line"><strong>SBSC standard:</strong> 35°F or below</div>
-      <div class="judgment ${reading.status.label === "PASS" ? "pass" : "fail"}">${reading.status.label} · ${reading.status.message.toUpperCase()}</div>
+      <div class="judgment ${reading.status.tier === "fail" ? "fail" : "pass"}">${displayJudgment(reading.status, "card")}</div>
       ${reading.notes ? `<div class="time-line"><strong>Notes:</strong> ${reading.notes}</div>` : ""}
     `;
     article.addEventListener("click", () => {
@@ -358,32 +375,250 @@ function milesBetween(lat1, lng1, lat2, lng2) {
   return haversineMiles({ lat: Number(lat1), lng: Number(lng1) }, { lat: Number(lat2), lng: Number(lng2) });
 }
 
+
+function normalizeVenueText(value = "") {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/['’`]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function canonicalVenueToken(token) {
+  const aliases = {
+    pizzeria: "pizza",
+    pizzaria: "pizza",
+    pizzas: "pizza",
+    grille: "grill",
+    tavern: "tavern",
+    taproom: "tap",
+    taprooms: "tap",
+    brewery: "brew",
+    brewing: "brew",
+    brewhouse: "brew"
+  };
+  return aliases[token] || token;
+}
+
+function venueTokens(value = "") {
+  const stop = new Set(["the", "a", "an", "of", "at", "and", "bar", "restaurant"]);
+  return normalizeVenueText(value)
+    .split(" ")
+    .map(canonicalVenueToken)
+    .filter(token => token.length > 1 && !stop.has(token));
+}
+
+function levenshteinDistance(a, b) {
+  const s = String(a);
+  const t = String(b);
+  if (!s.length) return t.length;
+  if (!t.length) return s.length;
+
+  let previous = Array.from({ length: t.length + 1 }, (_, i) => i);
+  let current = new Array(t.length + 1);
+
+  for (let i = 1; i <= s.length; i++) {
+    current[0] = i;
+    for (let j = 1; j <= t.length; j++) {
+      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + cost
+      );
+    }
+    [previous, current] = [current, previous];
+  }
+  return previous[t.length];
+}
+
+function stringSimilarity(a, b) {
+  const aa = normalizeVenueText(a);
+  const bb = normalizeVenueText(b);
+  if (!aa && !bb) return 1;
+  if (!aa || !bb) return 0;
+  if (aa === bb) return 1;
+  const longest = Math.max(aa.length, bb.length);
+  return Math.max(0, 1 - (levenshteinDistance(aa, bb) / longest));
+}
+
+function venueNameScore(query, venueName) {
+  const q = normalizeVenueText(query);
+  const n = normalizeVenueText(venueName);
+  if (!q || !n) return 0;
+
+  if (q === n) return 100;
+  if (n.startsWith(q) || q.startsWith(n)) return 96;
+  if (n.includes(q) || q.includes(n)) return 92;
+
+  const qTokens = venueTokens(q);
+  const nTokens = venueTokens(n);
+  if (!qTokens.length || !nTokens.length) {
+    return Math.round(stringSimilarity(q, n) * 82);
+  }
+
+  const tokenScores = qTokens.map(qt => {
+    let best = 0;
+    nTokens.forEach(nt => {
+      if (qt === nt) {
+        best = 1;
+      } else if (nt.startsWith(qt) || qt.startsWith(nt)) {
+        best = Math.max(best, 0.94);
+      } else {
+        best = Math.max(best, stringSimilarity(qt, nt));
+      }
+    });
+    return best;
+  });
+
+  const tokenAverage = tokenScores.reduce((sum, score) => sum + score, 0) / tokenScores.length;
+  const whole = stringSimilarity(q, n);
+
+  // Token similarity matters most for venue names because users often omit
+  // words such as "The", "Station", "Pizzeria", etc.
+  return Math.round(Math.max(tokenAverage * 90, whole * 84));
+}
+
+function knownSbscVenues() {
+  const seen = new Set();
+  return readings.map(r => {
+    const key = `${normalizeVenueText(r.bar)}|${Number(r.lat).toFixed(5)}|${Number(r.lng).toFixed(5)}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    return {
+      name: r.bar,
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      street: r.address || "",
+      city: r.city || "",
+      state: r.state || "CA",
+      distance: userPosition ? milesBetween(userPosition.lat, userPosition.lng, r.lat, r.lng) : NaN,
+      sbscKnown: true
+    };
+  }).filter(Boolean);
+}
+
+function venueCandidatePool() {
+  const seen = new Set();
+  const pool = [];
+
+  [...nearbyVenues, ...knownSbscVenues()].forEach(venue => {
+    if (!venue || !venue.name) return;
+    const key = `${normalizeVenueText(venue.name)}|${Number(venue.lat).toFixed(4)}|${Number(venue.lng).toFixed(4)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pool.push(venue);
+  });
+
+  return pool;
+}
+
+function fuzzyVenueMatches(query, limit = 8) {
+  const q = normalizeVenueText(query);
+  if (!q) return [];
+
+  return venueCandidatePool()
+    .map(venue => {
+      const matchScore = venueNameScore(q, venue.name);
+      const distance = Number.isFinite(venue.distance)
+        ? venue.distance
+        : (userPosition ? milesBetween(userPosition.lat, userPosition.lng, venue.lat, venue.lng) : NaN);
+
+      // Keep location as a tie-breaker, but name similarity is the main signal.
+      const distanceBonus = Number.isFinite(distance)
+        ? Math.max(0, 8 - Math.min(distance, 8))
+        : 0;
+
+      return { ...venue, distance, matchScore, rankScore: matchScore + distanceBonus };
+    })
+    .filter(venue => venue.matchScore >= 54)
+    .sort((a, b) => b.rankScore - a.rankScore || (a.distance || 999) - (b.distance || 999))
+    .slice(0, limit)
+    .map((venue, index) => ({
+      ...venue,
+      matchHint: index === 0 && venue.matchScore < 100 ? "Best match" : ""
+    }));
+}
+
+function uniqueSearchVariants(query) {
+  const variants = [];
+  const add = value => {
+    const cleaned = String(value || "").trim();
+    if (cleaned && !variants.some(v => normalizeVenueText(v) === normalizeVenueText(cleaned))) {
+      variants.push(cleaned);
+    }
+  };
+
+  add(query);
+
+  // If our nearby data strongly suggests a correction, use that official name
+  // for the external geocoder too.
+  const bestLocal = fuzzyVenueMatches(query, 1)[0];
+  if (bestLocal && bestLocal.matchScore >= 67) add(bestLocal.name);
+
+  const tokens = venueTokens(query)
+    .filter(token => token.length >= 4)
+    .sort((a, b) => b.length - a.length);
+
+  // A correctly spelled second word often rescues a misspelled first word:
+  // "Trannis Dockside" -> also search "Dockside".
+  if (tokens[0]) add(tokens[0]);
+  if (tokens[1]) add(`${tokens[0]} ${tokens[1]}`);
+
+  return variants.slice(0, 3);
+}
+
 function venueMeta(venue) {
   const bits = [];
+  if (venue.matchHint) bits.push(`★ ${venue.matchHint}`);
   if (Number.isFinite(venue.distance)) bits.push(`${venue.distance.toFixed(1)} mi`);
   if (venue.street) bits.push(venue.street);
   if (venue.city) bits.push(venue.city);
   return bits.join(" · ") || "Nearby";
 }
 
-function renderVenueResults(list) {
+function closeVenueResults() {
   els.venueResults.innerHTML = "";
-  if (!list.length) {
-    els.venueResults.innerHTML = '<div class="venue-empty">No nearby matches yet. Try typing the venue name.</div>';
-    els.venueResults.classList.add("open");
+  els.venueResults.classList.remove("open");
+  els.venueSearch.setAttribute("aria-expanded", "false");
+}
+
+function setVenueSelectionUI(isSelected) {
+  if (els.venueField) els.venueField.classList.toggle("has-selection", isSelected);
+}
+
+function renderVenueResults(list) {
+  if (selectedVenue) {
+    closeVenueResults();
     return;
   }
 
-  list.slice(0, 12).forEach(venue => {
+  els.venueResults.innerHTML = "";
+  if (!list.length) {
+    els.venueResults.innerHTML = '<div class="venue-empty">No close match yet. Keep typing — we’ll keep looking.</div>';
+    els.venueResults.classList.add("open");
+    els.venueSearch.setAttribute("aria-expanded", "true");
+    return;
+  }
+
+  list.slice(0, 10).forEach(venue => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "venue-option";
     button.setAttribute("role", "option");
-    button.innerHTML = `<span class="venue-option-name">${escapeHtml(venue.name)}</span><span class="venue-option-meta">${escapeHtml(venueMeta(venue))}</span>`;
+    const meta = venue.useCurrentLocation
+      ? "📍 Use this name at my current location"
+      : venueMeta(venue);
+    button.innerHTML = `<span class="venue-option-name">${escapeHtml(venue.name)}</span><span class="venue-option-meta">${escapeHtml(meta)}</span>`;
     button.addEventListener("click", () => chooseVenue(venue));
     els.venueResults.appendChild(button);
   });
   els.venueResults.classList.add("open");
+  els.venueSearch.setAttribute("aria-expanded", "true");
 }
 
 function escapeHtml(value = "") {
@@ -421,6 +656,16 @@ async function reverseVenue(lat, lng, fallback = {}) {
 }
 
 async function chooseVenue(venue) {
+  // Lock the choice immediately so a slower autocomplete request cannot reopen
+  // stale suggestions after the user has already picked the right venue.
+  venueSearchRequest += 1;
+  clearTimeout(venueSearchTimer);
+  selectedVenue = { ...venue };
+  els.venueSearch.value = venue.name;
+  setVenueSelectionUI(true);
+  closeVenueResults();
+  els.venueSearch.blur();
+
   els.venueStatus.textContent = "Confirming venue address…";
   els.venueStatus.classList.remove("selected");
 
@@ -432,9 +677,10 @@ async function chooseVenue(venue) {
   els.barAddress.value = selectedVenue.address;
   els.barCity.value = selectedVenue.city || "South Bay";
   els.barState.value = selectedVenue.state || "CA";
-  els.venueResults.classList.remove("open");
+  closeVenueResults();
   els.venueStatus.textContent = "";
   els.venueStatus.classList.add("selected");
+  setVenueSelectionUI(true);
 }
 
 async function fetchNearbyVenues(lat, lng) {
@@ -469,48 +715,156 @@ async function fetchNearbyVenues(lat, lng) {
   return nearbyVenues;
 }
 
-async function searchVenueByName(term) {
+async function searchVenueByName(term, requestId) {
   const query = term.trim();
-  if (query.length < 2) return;
+  if (query.length < 2 || requestId !== venueSearchRequest || selectedVenue) return;
 
-  const localMatches = nearbyVenues.filter(v => v.name.toLowerCase().includes(query.toLowerCase()));
-  if (localMatches.length) {
-    renderVenueResults(localMatches);
-    return;
-  }
+  // First answer instantly from nearby OSM venues + venues SBSC already knows.
+  // This is typo-tolerant: "trannis", "sardinee", "nikos pizza", etc.
+  const localMatches = fuzzyVenueMatches(query, 8);
+  if (localMatches.length && requestId === venueSearchRequest && !selectedVenue) renderVenueResults(localMatches);
 
   try {
-    const params = new URLSearchParams({
-      format: "jsonv2",
-      q: `${query}, California`,
-      limit: "8",
-      countrycodes: "us",
-      addressdetails: "1",
-      viewbox: "-118.55,34.05,-117.95,33.55"
+    const variants = uniqueSearchVariants(query);
+    const seen = new Set();
+    const remoteResults = [];
+
+    // Keep this deliberately small so we don't hammer the public geocoder.
+    for (const variant of variants) {
+      const searches = [
+        `${variant}, San Pedro, California`,
+        `${variant}, South Bay, Los Angeles County, California`
+      ];
+
+      for (const q of searches) {
+        const params = new URLSearchParams({
+          format: "jsonv2",
+          q,
+          limit: "8",
+          countrycodes: "us",
+          addressdetails: "1",
+          viewbox: "-118.55,34.05,-117.95,33.55",
+          bounded: "1"
+        });
+
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+        if (!response.ok) continue;
+        const data = await response.json();
+        if (requestId !== venueSearchRequest || selectedVenue) return;
+
+        data.forEach(row => {
+          const a = row.address || {};
+          const lat = Number(row.lat);
+          const lng = Number(row.lon);
+          if (!isSouthBayCoordinate(lat, lng)) return;
+
+          const name = row.name || row.display_name.split(",")[0];
+          if (!name) return;
+
+          const matchScore = venueNameScore(query, name);
+          // External results can still be useful when only one token survived
+          // the typo, but don't show unrelated map clutter.
+          if (matchScore < 42 && !normalizeVenueText(name).includes(normalizeVenueText(variant))) return;
+
+          const key = `${normalizeVenueText(name)}|${lat.toFixed(5)}|${lng.toFixed(5)}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          const distance = userPosition
+            ? milesBetween(userPosition.lat, userPosition.lng, lat, lng)
+            : NaN;
+
+          remoteResults.push({
+            name,
+            lat,
+            lng,
+            street: [a.house_number, a.road].filter(Boolean).join(" "),
+            city: localityFromAddress(a),
+            state: stateAbbreviation(a.state || "CA"),
+            distance,
+            matchScore
+          });
+        });
+
+        if (remoteResults.length >= 6) break;
+      }
+      if (remoteResults.length >= 6) break;
+    }
+
+    const combined = [];
+    const combinedKeys = new Set();
+
+    [...localMatches, ...remoteResults].forEach(v => {
+      const key = `${normalizeVenueText(v.name)}|${Number(v.lat).toFixed(5)}|${Number(v.lng).toFixed(5)}`;
+      if (combinedKeys.has(key)) return;
+      combinedKeys.add(key);
+
+      const matchScore = Number.isFinite(v.matchScore) ? v.matchScore : venueNameScore(query, v.name);
+      const distance = Number.isFinite(v.distance)
+        ? v.distance
+        : (userPosition ? milesBetween(userPosition.lat, userPosition.lng, v.lat, v.lng) : NaN);
+
+      combined.push({
+        ...v,
+        matchScore,
+        distance,
+        rankScore: matchScore + (Number.isFinite(distance) ? Math.max(0, 8 - Math.min(distance, 8)) : 0)
+      });
     });
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
-    if (!response.ok) throw new Error();
-    const data = await response.json();
-    const results = data.map(row => {
-      const a = row.address || {};
-      const city = localityFromAddress(a);
-      return {
-        name: row.name || row.display_name.split(",")[0],
-        lat: Number(row.lat),
-        lng: Number(row.lon),
-        street: [a.house_number, a.road].filter(Boolean).join(" "),
-        city,
-        state: stateAbbreviation(a.state || "CA"),
-        distance: userPosition ? milesBetween(userPosition.lat, userPosition.lng, Number(row.lat), Number(row.lon)) : NaN
-      };
-    }).filter(v => v.name && Number.isFinite(v.lat) && Number.isFinite(v.lng));
+
+    combined.sort((a, b) =>
+      b.rankScore - a.rankScore ||
+      (Number.isFinite(a.distance) ? a.distance : 9999) -
+      (Number.isFinite(b.distance) ? b.distance : 9999)
+    );
+
+    combined.slice(0, 8).forEach((venue, index) => {
+      if (index === 0 && venue.matchScore < 100) venue.matchHint = "Best match";
+    });
+
+    const results = combined.slice(0, 8);
+
+    // Last resort: the submission form is intended to be used at the venue.
+    // If map data cannot identify the business, let the user keep the typed
+    // name but anchor it to their live GPS position.
+    if (userPosition) {
+      results.push({
+        name: query,
+        lat: userPosition.lat,
+        lng: userPosition.lng,
+        street: "",
+        city: "",
+        state: "CA",
+        distance: 0,
+        useCurrentLocation: true
+      });
+    }
+
+    if (requestId !== venueSearchRequest || selectedVenue) return;
     renderVenueResults(results);
   } catch (error) {
-    els.venueStatus.textContent = "Could not search that name. Tap Nearby and try again.";
+    const fallback = [...localMatches];
+
+    if (userPosition) {
+      fallback.push({
+        name: query,
+        lat: userPosition.lat,
+        lng: userPosition.lng,
+        street: "",
+        city: "",
+        state: "CA",
+        distance: 0,
+        useCurrentLocation: true
+      });
+    }
+
+    if (requestId !== venueSearchRequest || selectedVenue) return;
+    renderVenueResults(fallback);
   }
 }
 
 async function startVenueLookup() {
+  const lookupRequest = ++venueSearchRequest;
   if (!navigator.geolocation) {
     els.venueStatus.textContent = "Location is unavailable. Start typing the venue name.";
     els.venueSearch.placeholder = "Type a bar or restaurant";
@@ -525,9 +879,11 @@ async function startVenueLookup() {
     userPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
     try {
       const venues = await fetchNearbyVenues(userPosition.lat, userPosition.lng);
-      els.venueSearch.placeholder = "Tap a nearby spot or start typing";
+      els.venueSearch.placeholder = "Search nearby bars & restaurants";
       els.venueStatus.textContent = venues.length ? "Tap the right place below." : "No nearby places found. Start typing the venue name.";
-      renderVenueResults(venues);
+      if (lookupRequest === venueSearchRequest && !selectedVenue && !els.venueSearch.value.trim()) {
+        renderVenueResults(venues);
+      }
     } catch (error) {
       els.venueStatus.textContent = "Nearby search had trouble loading. Start typing the venue name.";
       els.venueSearch.placeholder = "Type a bar or restaurant";
@@ -569,11 +925,13 @@ function resetSubmissionForm() {
   nearbyVenues = [];
   els.barState.value = "CA";
   els.measuredAt.value = localDateTimeValue();
+  venueSearchRequest += 1;
+  clearTimeout(venueSearchTimer);
   els.venueSearch.value = "";
-  els.venueSearch.placeholder = "Finding bars near you…";
-  els.venueResults.innerHTML = "";
-  els.venueResults.classList.remove("open");
-  els.venueStatus.textContent = "Use your location, then tap the right bar or restaurant.";
+  els.venueSearch.placeholder = "Search nearby bars & restaurants";
+  closeVenueResults();
+  setVenueSelectionUI(false);
+  els.venueStatus.textContent = "";
   els.venueStatus.classList.remove("selected");
   loadInstagramSuggestions();
   els.submissionFields.hidden = false;
@@ -731,27 +1089,48 @@ els.temp.addEventListener("change", render);
 els.city.addEventListener("change", render);
 els.locate.addEventListener("click", useLocation);
 els.venueSearch.addEventListener("input", () => {
-  if (selectedVenue && els.venueSearch.value.trim() !== selectedVenue.name) {
+  const term = els.venueSearch.value.trim();
+  const requestId = ++venueSearchRequest;
+  clearTimeout(venueSearchTimer);
+
+  if (selectedVenue && term !== selectedVenue.name) {
     selectedVenue = null;
     els.barName.value = "";
     els.barAddress.value = "";
     els.barCity.value = "";
+    els.barState.value = "CA";
+    setVenueSelectionUI(false);
     els.venueStatus.classList.remove("selected");
-    els.venueStatus.textContent = "Choose a venue from the suggestions.";
+    els.venueStatus.textContent = "";
   }
-  clearTimeout(venueSearchTimer);
-  const term = els.venueSearch.value.trim();
+
   if (!term) {
+    setVenueSelectionUI(false);
     renderVenueResults(nearbyVenues);
     return;
   }
-  const localMatches = nearbyVenues.filter(v => v.name.toLowerCase().includes(term.toLowerCase()));
+
+  const localMatches = fuzzyVenueMatches(term, 8);
   if (localMatches.length) renderVenueResults(localMatches);
-  venueSearchTimer = setTimeout(() => searchVenueByName(term), 500);
+  venueSearchTimer = setTimeout(() => searchVenueByName(term, requestId), 280);
 });
 
 els.venueSearch.addEventListener("focus", () => {
-  if (nearbyVenues.length && !selectedVenue) renderVenueResults(nearbyVenues);
+  if (nearbyVenues.length && !selectedVenue) {
+    const term = els.venueSearch.value.trim();
+    renderVenueResults(term ? fuzzyVenueMatches(term, 8) : nearbyVenues);
+  }
+});
+
+els.venueSearch.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closeVenueResults();
+    els.venueSearch.blur();
+  }
+});
+
+document.addEventListener("click", event => {
+  if (els.venueField && !els.venueField.contains(event.target)) closeVenueResults();
 });
 
 els.refreshVenues.addEventListener("click", startVenueLookup);

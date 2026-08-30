@@ -1,22 +1,22 @@
-SBSC V6.2 — MAP FIX
+SBSC V6.4 — CONSOLIDATED FILTER + VENUE UX UPDATE
 
-Do this in order:
+Replace these THREE root files:
+- index.html
+- styles.css
+- app.js
 
-1. Supabase SQL Editor
-   Run: supabase-v6-2-map-fix.sql
+This app.js includes V6.3 Smart Venue Search and V6.4 Certified Coldies wording.
 
-2. GitHub root
-   Replace: app.js
+Changes in this consolidated V6.4:
+- MAX TEMP becomes RESULTS
+- Results options: All verified readings / All certified Coldies ✅ / All verified fails ❌
+- Venue suggestion dropdown is visually cleaned up
+- Venue selection gets a subtle green check state
+- Suggestions close immediately after selection
+- Slow/stale search requests cannot reopen suggestions after a venue is selected
+- Clicking outside or pressing Escape closes suggestions
+- Typing again cleanly changes the selected venue
+- Fixed the malformed V6.0 venue CSS append that contained literal \n characters
+- Preserves 440px desktop hero and 160px mobile hero
 
-3. GitHub admin folder
-   Replace: admin/admin.js
-
-Do NOT replace index.html, CSS, favicon files, or any artwork.
-
-What this fixes:
-- Repairs Niko's 0,0 / Africa pin.
-- Corrects The Sardine and The Basque Club Taberna existing pins.
-- Fixes the null-coordinate bug permanently.
-- Rejects impossible/out-of-South-Bay coordinates.
-- Keeps later approvals from moving an already-established bar pin.
-- Refreshes the public readings automatically when you return to the site after approving a submission.
+No SQL or admin files are needed for this update.

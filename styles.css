@@ -57,4 +57,57 @@ dialog{border:none;background:transparent;padding:0}dialog::backdrop{background:
   .submit-form input[type="text"],.submit-form input[type="number"],.submit-form input[type="file"],.submit-form input[type="datetime-local"],.submit-form textarea{padding:10px;font-size:.88rem}
   .form-row{gap:8px}.state-field{max-width:88px}
 }
-\n\n/* V6.0 — fast location-first submission flow */\n.venue-field{position:relative}\n.venue-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}\n.venue-nearby-btn{border:1px solid var(--line);background:#eef5ff;color:#0b57b7;border-radius:11px;padding:11px 12px;font-weight:900;cursor:pointer}\n.venue-nearby-btn:disabled{opacity:.6;cursor:wait}\n.venue-status{margin-top:6px;color:var(--muted);font-size:.76rem;line-height:1.3}\n.venue-status.selected{color:#176b39;font-weight:800}\n.venue-results{display:none;margin-top:7px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;max-height:230px;overflow-y:auto;box-shadow:0 10px 25px rgba(17,32,54,.12)}\n.venue-results.open{display:block}\n.venue-option{width:100%;display:block;text-align:left;border:0;border-bottom:1px solid #edf0f4;background:#fff;padding:10px 11px;cursor:pointer;color:var(--ink)}\n.venue-option:last-child{border-bottom:0}\n.venue-option:hover,.venue-option:focus{background:#f2f7ff;outline:none}\n.venue-option-name{display:block;font-weight:900;font-size:.9rem}\n.venue-option-meta{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}\n.venue-empty{padding:11px;color:var(--muted);font-size:.8rem}\n.field-help{display:block;margin-top:5px;color:var(--muted);font-size:.72rem;font-weight:650;line-height:1.25}\n.submit-form select{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;color:var(--ink)}\n.quick-row{align-items:start}\n@media(max-width:640px){\n  .venue-input-row{grid-template-columns:minmax(0,1fr) auto;gap:6px}\n  .venue-nearby-btn{padding:10px 9px;font-size:.78rem}\n  .venue-results{max-height:200px}\n  .quick-row{grid-template-columns:1fr 1fr}\n  .submit-form select{padding:10px 8px;font-size:.82rem}\n  .field-help{font-size:.66rem}\n}\n
+
+
+/* V6.4 — clean submission search + filter UX */
+.venue-field{position:relative;z-index:20}
+.venue-input-row{position:relative;display:block}
+.venue-input-row input{
+  width:100%;
+  padding:12px 42px 12px 13px;
+  border:1px solid #cfd9e6;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:inset 0 1px 2px rgba(17,32,54,.03);
+  transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;
+}
+.venue-input-row input:focus{outline:none;border-color:#6ca9e8;box-shadow:0 0 0 3px rgba(11,87,183,.11)}
+.venue-field.has-selection .venue-input-row input{border-color:#62bd84;background:#f4fff8;box-shadow:0 0 0 3px rgba(50,168,92,.10)}
+.venue-field.has-selection .venue-input-row::after{
+  content:"✓";position:absolute;right:13px;top:50%;transform:translateY(-50%);
+  width:23px;height:23px;border-radius:50%;display:grid;place-items:center;
+  background:#32a85c;color:#fff;font-size:.78rem;font-weight:1000;pointer-events:none;
+}
+.venue-nearby-btn[hidden],.venue-status[hidden]{display:none!important}
+.venue-results{
+  display:none;position:absolute;left:0;right:0;top:100%;z-index:80;
+  margin-top:6px;border:1px solid #d5dfeb;border-radius:14px;background:#fff;
+  overflow:hidden;max-height:245px;overflow-y:auto;
+  box-shadow:0 16px 34px rgba(17,32,54,.18);
+  -webkit-overflow-scrolling:touch;
+}
+.venue-results.open{display:block}
+.venue-option{
+  width:100%;display:block;text-align:left;border:0;border-bottom:1px solid #edf1f5;
+  background:#fff;padding:11px 13px;cursor:pointer;color:var(--ink);
+}
+.venue-option:last-child{border-bottom:0}
+.venue-option:hover,.venue-option:focus{background:#f3f8ff;outline:none}
+.submit-form .venue-option-name{display:block;margin:0;color:var(--ink);font-weight:900;font-size:.9rem;line-height:1.18}
+.submit-form .venue-option-meta{display:block;margin:3px 0 0;color:var(--muted);font-weight:650;font-size:.71rem;line-height:1.25;text-transform:none;letter-spacing:0}
+.venue-option:first-child .venue-option-meta{color:#0b57b7}
+.venue-empty{padding:12px 13px;color:var(--muted);font-size:.8rem;line-height:1.3}
+.field-help{display:block;margin-top:5px;color:var(--muted);font-size:.72rem;font-weight:650;line-height:1.25}
+.submit-form select{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;color:var(--ink)}
+.quick-row{align-items:start}
+
+@media(max-width:640px){
+  .venue-input-row input{padding:10px 39px 10px 11px;font-size:.88rem}
+  .venue-results{max-height:220px;border-radius:12px}
+  .venue-option{padding:10px 11px}
+  .submit-form .venue-option-name{font-size:.85rem}
+  .submit-form .venue-option-meta{font-size:.68rem}
+  .quick-row{grid-template-columns:1fr 1fr}
+  .submit-form select{padding:10px 8px;font-size:.82rem}
+  .field-help{font-size:.66rem}
+}
