@@ -74,10 +74,19 @@ async function loadQueue() {
 }
 
 function hasStoredCoords(r) {
+  // Important: Number(null) is 0, so null must be rejected BEFORE numeric conversion.
+  if (r.latitude === null || r.latitude === undefined ||
+      r.longitude === null || r.longitude === undefined ||
+      r.latitude === "" || r.longitude === "") return false;
+
   const lat = Number(r.latitude);
   const lng = Number(r.longitude);
+
+  // SBSC is South Bay-only. This also prevents a bad 0,0 coordinate from ever
+  // being treated as a valid venue location.
   return Number.isFinite(lat) && Number.isFinite(lng) &&
-         lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+         lat >= 33.55 && lat <= 34.10 &&
+         lng >= -118.75 && lng <= -117.90;
 }
 
 function cardHtml(r,photoUrl) {
@@ -132,9 +141,10 @@ function edited(r) {
 async function locateLegacySubmission(r) {
   const e=edited(r);
   const searches=[
+    `${e.bar_name}, ${e.address}, ${e.city}, ${e.state}, USA`,
+    `${e.bar_name}, ${e.city}, ${e.state}, USA`,
     `${e.address}, ${e.city}, ${e.state}, USA`,
-    `${e.address}, ${e.city}, USA`,
-    `${e.bar_name}, ${e.city}, ${e.state}, USA`
+    `${e.address}, ${e.city}, USA`
   ];
 
   try {
@@ -152,7 +162,10 @@ async function locateLegacySubmission(r) {
     if(!result) throw new Error("Address not found");
 
     const lat=Number(result.lat),lng=Number(result.lon);
-    if(!Number.isFinite(lat)||!Number.isFinite(lng)) throw new Error("Invalid coordinates");
+    if(!Number.isFinite(lat)||!Number.isFinite(lng) ||
+       lat < 33.55 || lat > 34.10 || lng < -118.75 || lng > -117.90) {
+      throw new Error("Invalid South Bay coordinates");
+    }
 
     geocodes.set(r.id,{lat,lng});
     document.getElementById(`approve-${r.id}`).disabled=false;
