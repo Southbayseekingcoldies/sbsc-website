@@ -26,12 +26,28 @@ async function signedPhoto(path){if(!path)return null;const{data,error}=await cl
 
 function setTab(which){const approved=which==="approved";el.pendingTab.classList.toggle("active",!approved);el.approvedTab.classList.toggle("active",approved);el.pendingPanel.hidden=approved;el.approvedPanel.hidden=!approved;if(approved)loadApproved()}
 
-async function googleSuggest(q){const r=await fetch(`/api/places-autocomplete?q=${encodeURIComponent(q)}`);if(!r.ok)return[];const d=await r.json();return d.suggestions||[]}
-async function googleDetails(id){const r=await fetch(`/api/place-details?id=${encodeURIComponent(id)}`);if(!r.ok)return null;return r.json()}
+async function googleSuggest(q){
+  const r=await fetch(`/api/places-autocomplete?q=${encodeURIComponent(q)}`);
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||`Google Places error ${r.status}`);
+  return d.suggestions||[];
+}
+async function googleDetails(id){
+  const r=await fetch(`/api/place-details?id=${encodeURIComponent(id)}`);
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||`Google Place details error ${r.status}`);
+  return d;
+}
 function attachVenueLookup(host,onPick){
-  const input=host.querySelector(".venue-lookup-input"),results=host.querySelector(".venue-results");let timer,requestId=0;
+  const input=host.querySelector(".venue-lookup-input"),results=host.querySelector(".venue-results");
+  let timer,requestId=0;
+
   const close=()=>{results.innerHTML="";results.hidden=true};
-  const open=()=>{results.hidden=false};
+  const message=(text,kind="venue-info")=>{
+    results.innerHTML=`<div class="${kind}">${esc(text)}</div>`;
+    results.hidden=false;
+  };
+
   input.setAttribute("autocomplete","off");
   input.setAttribute("autocapitalize","words");
 
@@ -40,29 +56,44 @@ function attachVenueLookup(host,onPick){
     const q=input.value.trim();
     close();
     if(q.length<2)return;
-    const myRequest=++requestId;
+
+    const mine=++requestId;
     timer=setTimeout(async()=>{
-      const hits=await googleSuggest(q);
-      if(myRequest!==requestId)return;
-      results.innerHTML="";
-      if(!hits.length){close();return}
-      hits.slice(0,6).forEach(hit=>{
-        const b=document.createElement("button");
-        b.type="button";
-        b.className="venue-hit";
-        b.innerHTML=`<strong>${esc(hit.mainText||hit.text)}</strong><small>${esc(hit.secondaryText||hit.text||"")}</small>`;
-        b.onclick=async()=>{
-          const p=await googleDetails(hit.placeId);
-          if(!p)return;
-          onPick(p);
-          input.value=p.name||hit.mainText||"";
-          close();
-          input.blur();
-        };
-        results.appendChild(b);
-      });
-      open();
-    },220);
+      message("Searching Google Places…");
+      try{
+        const hits=await googleSuggest(q);
+        if(mine!==requestId)return;
+
+        results.innerHTML="";
+        if(!hits.length){
+          message("No Google Places matches. Try more of the venue name.");
+          return;
+        }
+
+        hits.slice(0,7).forEach(hit=>{
+          const b=document.createElement("button");
+          b.type="button";
+          b.className="venue-hit";
+          b.innerHTML=`<strong>${esc(hit.mainText||hit.text)}</strong><small>${esc(hit.secondaryText||hit.text||"")}</small>`;
+          b.onclick=async()=>{
+            try{
+              const p=await googleDetails(hit.placeId);
+              onPick(p);
+              input.value=p.name||hit.mainText||"";
+              close();
+              input.blur();
+            }catch(err){
+              message(err.message||"Could not load that venue.","venue-error");
+            }
+          };
+          results.appendChild(b);
+        });
+        results.hidden=false;
+      }catch(err){
+        if(mine!==requestId)return;
+        message(err.message||"Google Places lookup failed.","venue-error");
+      }
+    },250);
   });
 
   input.addEventListener("keydown",e=>{if(e.key==="Escape")close()});
@@ -80,7 +111,7 @@ function pendingCard(r,photo){
   const coords=southBay(Number(r.latitude),Number(r.longitude));
   if(coords)pendingCoords.set(r.id,{lat:Number(r.latitude),lng:Number(r.longitude),placeId:r.google_place_id||null});
   return `<article class="review-card" id="card-${r.id}"><div class="photo-wrap">${photo?`<img src="${esc(photo)}" alt="Thermometer evidence">`:'<div class="photo-placeholder">Photo unavailable</div>'}</div><div class="review-body"><div class="review-summary"><div><div class="submitted-label">Submitted</div><strong>${esc(r.bar_name)}</strong><div class="meta">${esc(r.serve_type||"Draft")} · ${esc(r.beer_name)} · ${esc(when(r.measured_at))}</div></div><div class="submitted-temp">${Math.round(Number(r.temperature_f))}°F</div></div><div class="section-title">Review / correct</div><div class="edit-grid">
-  <label class="wide admin-place-wrap" id="venueLookup-${r.id}">Bar / restaurant <span class="field-note">Google Places autofill</span><input class="venue-lookup-input" id="bar-${r.id}" value="${esc(r.bar_name)}" autocomplete="off"><div class="venue-results" hidden></div></label><label class="wide">Street address<input id="address-${r.id}" value="${esc(r.address)}"></label><label>City<input id="city-${r.id}" value="${esc(r.city)}"></label><label>State<input id="state-${r.id}" value="${esc(r.state||"CA")}"></label><label>Beer<input id="beer-${r.id}" value="${esc(r.beer_name)}"></label><label>Served as<select id="serve-${r.id}"><option ${(!r.serve_type||r.serve_type==="Draft")?"selected":""}>Draft</option><option ${r.serve_type==="Bottle"?"selected":""}>Bottle</option></select></label><label>Temperature °F<input id="temp-${r.id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}"></label><label>Latitude<input id="lat-${r.id}" type="number" step="any" value="${coords?Number(r.latitude):""}"></label><label>Longitude<input id="lng-${r.id}" type="number" step="any" value="${coords?Number(r.longitude):""}"></label><label class="wide">Measured at<input id="when-${r.id}" type="datetime-local" value="${esc(localInput(r.measured_at))}"></label><label class="wide">Notes<textarea id="notes-${r.id}">${esc(r.notes||"")}</textarea></label></div>
+  <label class="wide admin-place-wrap" id="venueLookup-${r.id}">Bar / restaurant <span class="field-note">Google Places autofill</span><input class="venue-lookup-input" id="bar-${r.id}" value="${esc(r.bar_name)}" autocomplete="off"><div class="venue-results" hidden></div></label><label class="wide">Street address<input id="address-${r.id}" value="${esc(r.address)}"></label><label>City<input id="city-${r.id}" value="${esc(r.city)}"></label><label>State<input id="state-${r.id}" value="${esc(r.state||"CA")}"></label><label>Beer<input id="beer-${r.id}" value="${esc(r.beer_name)}"></label><label>Served as<select id="serve-${r.id}"><option ${(!r.serve_type||r.serve_type==="Draft")?"selected":""}>Draft</option><option ${r.serve_type==="Bottle"?"selected":""}>Bottle</option></select></label><label>Temperature °F<input id="temp-${r.id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}"></label><input id="lat-${r.id}" type="hidden" value="${coords?Number(r.latitude):""}"><input id="lng-${r.id}" type="hidden" value="${coords?Number(r.longitude):""}"><label class="wide">Measured at<input id="when-${r.id}" type="datetime-local" value="${esc(localInput(r.measured_at))}"></label><label class="wide">Notes<textarea id="notes-${r.id}">${esc(r.notes||"")}</textarea></label></div>
   <input id="place-${r.id}" type="hidden" value="${esc(r.google_place_id||"")}">${r.submitter_instagram?`<div class="meta">Submitted by ${esc(r.submitter_instagram)}</div>`:""}<div class="reject-box" id="rejectbox-${r.id}" hidden><label>Reject reason<select id="reason-${r.id}"><option>Unreadable thermometer</option><option>No thermometer visible</option><option>Submitted temperature does not match photo</option><option>Duplicate submission</option><option>Wrong location</option><option>Other</option></select></label><label>Optional detail<textarea id="rejectnotes-${r.id}"></textarea></label></div><div class="actions"><button class="danger" id="reject-${r.id}">Reject</button><button class="approve" id="approve-${r.id}" ${coords?"":"disabled"}>Approve</button></div></div></article>`;
 }
 function pendingEdited(r){return{bar_name:document.getElementById(`bar-${r.id}`).value.trim(),address:document.getElementById(`address-${r.id}`).value.trim(),city:document.getElementById(`city-${r.id}`).value.trim(),state:document.getElementById(`state-${r.id}`).value.trim()||"CA",beer_name:document.getElementById(`beer-${r.id}`).value.trim(),serve_type:document.getElementById(`serve-${r.id}`).value,temperature_f:Number(document.getElementById(`temp-${r.id}`).value),latitude:Number(document.getElementById(`lat-${r.id}`).value),longitude:Number(document.getElementById(`lng-${r.id}`).value),google_place_id:document.getElementById(`place-${r.id}`).value||null,measured_at:document.getElementById(`when-${r.id}`).value,notes:document.getElementById(`notes-${r.id}`).value.trim()||null}}
@@ -94,7 +125,7 @@ async function rejectPending(r){const box=document.getElementById(`rejectbox-${r
 async function loadApproved(){
   el.approvedList.innerHTML='<div class="empty">Loading approved readings…</div>';const q=el.approvedSearch.value.trim();const{data,error}=await client.rpc("admin_list_approved_readings_v1",{p_search:q||null});if(error){el.approvedList.innerHTML=`<div class="empty">Could not load approved entries: ${esc(error.message)}</div>`;return}const rows=Array.isArray(data)?data:[];const photos=await Promise.all(rows.map(r=>signedPhoto(r.photo_path)));el.approvedList.innerHTML=rows.length?rows.map((r,i)=>approvedCard(r,photos[i])).join(""):'<div class="empty">No matching approved readings.</div>';rows.forEach(wireApproved)
 }
-function approvedCard(r,photo){return `<article class="review-card approved-entry" id="approved-${r.reading_id}">${photo?`<div class="photo-wrap"><img src="${esc(photo)}" alt="Approved thermometer evidence"></div>`:""}<div class="review-body"><div class="review-summary"><div><div class="submitted-label">Approved reading</div><strong>${esc(r.bar_name)}</strong><div class="meta">${esc(r.serve_type||"Draft")} · ${esc(r.beer_name)} · ${esc(when(r.measured_at))}</div></div><div class="submitted-temp">${Math.round(Number(r.temperature_f))}°F</div></div><div class="edit-grid"><label class="wide admin-place-wrap" id="approvedLookup-${r.reading_id}">Bar / restaurant <span class="field-note">Google Places autofill</span><input class="venue-lookup-input" id="abar-${r.reading_id}" value="${esc(r.bar_name)}" autocomplete="off"><div class="venue-results" hidden></div></label><label class="wide">Street address<input id="aaddress-${r.reading_id}" value="${esc(r.address)}"></label><label>City<input id="acity-${r.reading_id}" value="${esc(r.city)}"></label><label>State<input id="astate-${r.reading_id}" value="${esc(r.state||"CA")}"></label><label>Beer<input id="abeer-${r.reading_id}" value="${esc(r.beer_name)}"></label><label>Served as<select id="aserve-${r.reading_id}"><option ${r.serve_type==="Draft"?"selected":""}>Draft</option><option ${r.serve_type==="Bottle"?"selected":""}>Bottle</option></select></label><label>Temperature °F<input id="atemp-${r.reading_id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}"></label><label>Latitude<input id="alat-${r.reading_id}" type="number" step="any" value="${r.latitude}"></label><label>Longitude<input id="alng-${r.reading_id}" type="number" step="any" value="${r.longitude}"></label><label class="wide">Measured at<input id="awhen-${r.reading_id}" type="datetime-local" value="${esc(localInput(r.measured_at))}"></label><label class="wide">Notes<textarea id="anotes-${r.reading_id}">${esc(r.notes||"")}</textarea></label></div><input id="aplace-${r.reading_id}" type="hidden" value="${esc(r.google_place_id||"")}"><div class="actions"><button class="approve" id="save-${r.reading_id}">Save approved entry</button></div><div class="save-state" id="saveState-${r.reading_id}"></div></div></article>`}
+function approvedCard(r,photo){return `<article class="review-card approved-entry" id="approved-${r.reading_id}">${photo?`<div class="photo-wrap"><img src="${esc(photo)}" alt="Approved thermometer evidence"></div>`:""}<div class="review-body"><div class="review-summary"><div><div class="submitted-label">Approved reading</div><strong>${esc(r.bar_name)}</strong><div class="meta">${esc(r.serve_type||"Draft")} · ${esc(r.beer_name)} · ${esc(when(r.measured_at))}</div></div><div class="submitted-temp">${Math.round(Number(r.temperature_f))}°F</div></div><div class="edit-grid"><label class="wide admin-place-wrap" id="approvedLookup-${r.reading_id}">Bar / restaurant <span class="field-note">Google Places autofill</span><input class="venue-lookup-input" id="abar-${r.reading_id}" value="${esc(r.bar_name)}" autocomplete="off"><div class="venue-results" hidden></div></label><label class="wide">Street address<input id="aaddress-${r.reading_id}" value="${esc(r.address)}"></label><label>City<input id="acity-${r.reading_id}" value="${esc(r.city)}"></label><label>State<input id="astate-${r.reading_id}" value="${esc(r.state||"CA")}"></label><label>Beer<input id="abeer-${r.reading_id}" value="${esc(r.beer_name)}"></label><label>Served as<select id="aserve-${r.reading_id}"><option ${r.serve_type==="Draft"?"selected":""}>Draft</option><option ${r.serve_type==="Bottle"?"selected":""}>Bottle</option></select></label><label>Temperature °F<input id="atemp-${r.reading_id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}"></label><input id="alat-${r.reading_id}" type="hidden" value="${r.latitude}"><input id="alng-${r.reading_id}" type="hidden" value="${r.longitude}"><label class="wide">Measured at<input id="awhen-${r.reading_id}" type="datetime-local" value="${esc(localInput(r.measured_at))}"></label><label class="wide">Notes<textarea id="anotes-${r.reading_id}">${esc(r.notes||"")}</textarea></label></div><input id="aplace-${r.reading_id}" type="hidden" value="${esc(r.google_place_id||"")}"><div class="actions"><button class="approve" id="save-${r.reading_id}">Save approved entry</button></div><div class="save-state" id="saveState-${r.reading_id}"></div></div></article>`}
 function wireApproved(r){const lookup=document.getElementById(`approvedLookup-${r.reading_id}`);attachVenueLookup(lookup,p=>{document.getElementById(`abar-${r.reading_id}`).value=p.name||"";document.getElementById(`aaddress-${r.reading_id}`).value=p.address||p.formattedAddress||"";document.getElementById(`acity-${r.reading_id}`).value=p.city||"";document.getElementById(`astate-${r.reading_id}`).value=p.state||"CA";document.getElementById(`alat-${r.reading_id}`).value=p.lat;document.getElementById(`alng-${r.reading_id}`).value=p.lng;document.getElementById(`aplace-${r.reading_id}`).value=p.placeId||""});document.getElementById(`save-${r.reading_id}`).onclick=()=>saveApproved(r)}
 async function saveApproved(r){const id=r.reading_id,payload={reading_id:String(id),bar_name:document.getElementById(`abar-${id}`).value.trim(),address:document.getElementById(`aaddress-${id}`).value.trim(),city:document.getElementById(`acity-${id}`).value.trim(),state:document.getElementById(`astate-${id}`).value.trim()||"CA",google_place_id:document.getElementById(`aplace-${id}`).value||null,latitude:Number(document.getElementById(`alat-${id}`).value),longitude:Number(document.getElementById(`alng-${id}`).value),beer_name:document.getElementById(`abeer-${id}`).value.trim(),serve_type:document.getElementById(`aserve-${id}`).value,temperature_f:Number(document.getElementById(`atemp-${id}`).value),measured_at:new Date(document.getElementById(`awhen-${id}`).value).toISOString(),notes:document.getElementById(`anotes-${id}`).value.trim()||null};if(!southBay(payload.latitude,payload.longitude))return alert("Invalid South Bay coordinates.");if(!confirm(`Save changes to this approved reading?`))return;const card=document.getElementById(`approved-${id}`);card.classList.add("busy");const{error}=await client.rpc("admin_update_approved_reading_v1",{p_payload:payload});card.classList.remove("busy");if(error)return alert(`Save failed: ${error.message}`);document.getElementById(`saveState-${id}`).textContent="Saved ✓";setTimeout(()=>loadApproved(),650)}
 

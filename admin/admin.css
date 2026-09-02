@@ -39,3 +39,13 @@
 .admin-place-wrap .venue-hit:active{background:#eef7ff}
 .admin-place-wrap .venue-hit strong{display:block;font-size:.96rem}
 .admin-place-wrap .venue-hit small{display:block;margin-top:2px;color:var(--muted);font-size:.78rem;font-weight:600}
+
+.venue-info,.venue-error{
+  padding:11px 12px;
+  border-radius:9px;
+  font-size:.82rem;
+  font-weight:750;
+  line-height:1.35;
+}
+.venue-info{background:#eef7ff;color:#155ea8}
+.venue-error{background:#fff0f0;color:#b42318;border:1px solid #ffd1d1}
