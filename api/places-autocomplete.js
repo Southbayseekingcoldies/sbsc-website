@@ -31,7 +31,12 @@ module.exports = async function handler(req, res) {
         includedRegionCodes: ["us"],
         languageCode: "en",
         regionCode: "US",
-        locationBias: { circle: { center, radius: 60000 } }
+        locationBias: {
+          circle: {
+            center,
+            radius: 50000
+          }
+        }
       })
     });
 
