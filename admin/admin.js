@@ -2,198 +2,65 @@ const SUPABASE_URL = "https://horiiomkrvjtmcaoinlj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_0beNsBeuCwfaVbk8jGDWZg_nNiicK0O";
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const el = {
-  loginPanel: document.getElementById("loginPanel"),
-  queuePanel: document.getElementById("queuePanel"),
-  email: document.getElementById("email"),
-  password: document.getElementById("password"),
-  login: document.getElementById("login"),
-  signOut: document.getElementById("signOut"),
-  loginMessage: document.getElementById("loginMessage"),
-  adminStatus: document.getElementById("adminStatus"),
-  queue: document.getElementById("queue"),
-  pendingCount: document.getElementById("pendingCount")
-};
+const el = Object.fromEntries([
+  "loginPanel","queuePanel","email","password","login","signOut","loginMessage","adminStatus","queue","pendingCount",
+  "pendingTab","approvedTab","pendingPanel","approvedPanel","refreshPending","refreshApproved","approvedSearch","approvedSearchBtn","approvedList"
+].map(id=>[id,document.getElementById(id)]));
+const pendingCoords = new Map();
 
-const geocodes = new Map();
+const esc=(v="")=>String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+const when=v=>{const d=new Date(v);return Number.isNaN(d.getTime())?"Unknown":d.toLocaleString([], {month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})};
+const localInput=v=>{const d=new Date(v);if(Number.isNaN(d.getTime()))return"";const p=n=>String(n).padStart(2,"0");return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
+const southBay=(lat,lng)=>Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=33.55&&lat<=34.10&&lng>=-118.75&&lng<=-117.90;
 
-function escapeHtml(value="") {
-  return String(value).replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
+async function checkAdmin(){
+  const {data:{session}}=await client.auth.getSession(); if(!session)return loggedOut();
+  const {data,error}=await client.rpc("is_admin");
+  if(error||data!==true){await client.auth.signOut();loggedOut();el.loginMessage.textContent="This account is not authorized as an SBSC admin.";return;}
+  el.loginPanel.hidden=true;el.queuePanel.hidden=false;el.signOut.hidden=false;el.adminStatus.textContent=`Signed in as ${session.user.email}`;await loadQueue();
 }
-function formatWhen(value) {
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "Unknown time" : d.toLocaleString([], {month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
-}
-function toLocalInput(value) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad=n=>String(n).padStart(2,"0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function message(text) { el.loginMessage.textContent = text || ""; }
+function loggedOut(){el.loginPanel.hidden=false;el.queuePanel.hidden=true;el.signOut.hidden=true;el.adminStatus.textContent="Sign in to review Coldies."}
+async function login(){el.login.disabled=true;const{error}=await client.auth.signInWithPassword({email:el.email.value.trim(),password:el.password.value});el.login.disabled=false;if(error)return el.loginMessage.textContent=error.message;el.loginMessage.textContent="";await checkAdmin()}
+async function signOut(){await client.auth.signOut();loggedOut()}
+async function signedPhoto(path){if(!path)return null;const{data,error}=await client.storage.from("submission-photos").createSignedUrl(path,3600);return error?null:data.signedUrl}
 
-async function checkAdmin() {
-  const { data: { session } } = await client.auth.getSession();
-  if (!session) return showLoggedOut();
-  const { data, error } = await client.rpc("is_admin");
-  if (error || data !== true) {
-    await client.auth.signOut(); showLoggedOut(); message("This account is not authorized as an SBSC admin."); return;
-  }
-  el.loginPanel.hidden = true; el.queuePanel.hidden = false; el.signOut.hidden = false;
-  el.adminStatus.textContent = `Signed in as ${session.user.email}`;
-  await loadQueue();
-}
-function showLoggedOut() {
-  el.loginPanel.hidden = false; el.queuePanel.hidden = true; el.signOut.hidden = true;
-  el.adminStatus.textContent = "Sign in to review pending Coldies.";
-}
-async function login() {
-  message(""); el.login.disabled = true; el.login.textContent = "Signing in…";
-  const { error } = await client.auth.signInWithPassword({email:el.email.value.trim(),password:el.password.value});
-  el.login.disabled = false; el.login.textContent = "Sign in";
-  if (error) return message(error.message); await checkAdmin();
-}
-async function signOut() { await client.auth.signOut(); showLoggedOut(); }
-async function signedPhoto(path) {
-  if (!path) return null;
-  const { data, error } = await client.storage.from("submission-photos").createSignedUrl(path,3600);
-  return error ? null : data.signedUrl;
+function setTab(which){const approved=which==="approved";el.pendingTab.classList.toggle("active",!approved);el.approvedTab.classList.toggle("active",approved);el.pendingPanel.hidden=approved;el.approvedPanel.hidden=!approved;if(approved)loadApproved()}
+
+async function googleSuggest(q){const r=await fetch(`/api/places-autocomplete?q=${encodeURIComponent(q)}`);if(!r.ok)return[];const d=await r.json();return d.suggestions||[]}
+async function googleDetails(id){const r=await fetch(`/api/place-details?id=${encodeURIComponent(id)}`);if(!r.ok)return null;return r.json()}
+function attachVenueLookup(host,onPick){
+  const input=host.querySelector(".venue-lookup-input"),results=host.querySelector(".venue-results");let timer;
+  input.addEventListener("input",()=>{clearTimeout(timer);const q=input.value.trim();results.innerHTML="";if(q.length<2)return;timer=setTimeout(async()=>{const hits=await googleSuggest(q);results.innerHTML="";hits.forEach(hit=>{const b=document.createElement("button");b.type="button";b.className="venue-hit";b.innerHTML=`${esc(hit.mainText||hit.text)}<small>${esc(hit.secondaryText||hit.text||"")}</small>`;b.onclick=async()=>{const p=await googleDetails(hit.placeId);if(!p)return;onPick(p);results.innerHTML="";input.value=p.name||hit.mainText||""};results.appendChild(b)})},250)});
 }
 
-async function loadQueue() {
-  el.queue.innerHTML = '<div class="empty">Loading pending submissions…</div>';
-  const { data, error } = await client.from("submissions")
-    .select("id,bar_name,address,city,state,latitude,longitude,beer_name,temperature_f,measured_at,photo_path,submitter_instagram,notes,status,created_at")
-    .eq("status","pending").order("created_at",{ascending:false});
-  if (error) { el.queue.innerHTML=`<div class="empty">Could not load queue: ${escapeHtml(error.message)}</div>`; return; }
-  const rows=data||[]; el.pendingCount.textContent=rows.length;
-  if (!rows.length) { el.queue.innerHTML='<div class="empty">No pending Coldies. 🍺</div>'; return; }
-  const photoUrls=await Promise.all(rows.map(r=>signedPhoto(r.photo_path)));
-  el.queue.innerHTML=rows.map((r,i)=>cardHtml(r,photoUrls[i])).join("");
-  rows.forEach(r=>wireCard(r));
+async function loadQueue(){
+  el.queue.innerHTML='<div class="empty">Loading pending submissions…</div>';
+  const {data,error}=await client.from("submissions").select("id,bar_name,address,city,state,latitude,longitude,google_place_id,beer_name,serve_type,temperature_f,measured_at,photo_path,submitter_instagram,notes,status,created_at").eq("status","pending").order("created_at",{ascending:false});
+  if(error){el.queue.innerHTML=`<div class="empty">Could not load queue: ${esc(error.message)}</div>`;return}
+  const rows=data||[];el.pendingCount.textContent=rows.length;if(!rows.length){el.queue.innerHTML='<div class="empty">No pending Coldies. 🍺</div>';return}
+  const photos=await Promise.all(rows.map(r=>signedPhoto(r.photo_path)));el.queue.innerHTML=rows.map((r,i)=>pendingCard(r,photos[i])).join("");rows.forEach(wirePending);
 }
-
-function hasStoredCoords(r) {
-  // Important: Number(null) is 0, so null must be rejected BEFORE numeric conversion.
-  if (r.latitude === null || r.latitude === undefined ||
-      r.longitude === null || r.longitude === undefined ||
-      r.latitude === "" || r.longitude === "") return false;
-
-  const lat = Number(r.latitude);
-  const lng = Number(r.longitude);
-
-  // SBSC is South Bay-only. This also prevents a bad 0,0 coordinate from ever
-  // being treated as a valid venue location.
-  return Number.isFinite(lat) && Number.isFinite(lng) &&
-         lat >= 33.55 && lat <= 34.10 &&
-         lng >= -118.75 && lng <= -117.90;
+function pendingCard(r,photo){
+  const coords=southBay(Number(r.latitude),Number(r.longitude));
+  if(coords)pendingCoords.set(r.id,{lat:Number(r.latitude),lng:Number(r.longitude),placeId:r.google_place_id||null});
+  return `<article class="review-card" id="card-${r.id}"><div class="photo-wrap">${photo?`<img src="${esc(photo)}" alt="Thermometer evidence">`:'<div class="photo-placeholder">Photo unavailable</div>'}</div><div class="review-body"><div class="review-summary"><div><div class="submitted-label">Submitted</div><strong>${esc(r.bar_name)}</strong><div class="meta">${esc(r.serve_type||"Draft")} · ${esc(r.beer_name)} · ${esc(when(r.measured_at))}</div></div><div class="submitted-temp">${Math.round(Number(r.temperature_f))}°F</div></div><div class="section-title">Review / correct</div><div class="edit-grid">
+  <label class="wide">Bar / restaurant<input id="bar-${r.id}" value="${esc(r.bar_name)}"></label><label class="wide">Street address<input id="address-${r.id}" value="${esc(r.address)}"></label><label>City<input id="city-${r.id}" value="${esc(r.city)}"></label><label>State<input id="state-${r.id}" value="${esc(r.state||"CA")}"></label><label>Beer<input id="beer-${r.id}" value="${esc(r.beer_name)}"></label><label>Served as<select id="serve-${r.id}"><option ${(!r.serve_type||r.serve_type==="Draft")?"selected":""}>Draft</option><option ${r.serve_type==="Bottle"?"selected":""}>Bottle</option></select></label><label>Temperature °F<input id="temp-${r.id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}"></label><label>Latitude<input id="lat-${r.id}" type="number" step="any" value="${coords?Number(r.latitude):""}"></label><label>Longitude<input id="lng-${r.id}" type="number" step="any" value="${coords?Number(r.longitude):""}"></label><label class="wide">Measured at<input id="when-${r.id}" type="datetime-local" value="${esc(localInput(r.measured_at))}"></label><label class="wide">Notes<textarea id="notes-${r.id}">${esc(r.notes||"")}</textarea></label></div>
+  <div class="venue-lookup" id="venueLookup-${r.id}"><label>Find/correct venue with Google Places<input class="venue-lookup-input" placeholder="Type venue name"></label><div class="venue-results"></div></div>
+  <input id="place-${r.id}" type="hidden" value="${esc(r.google_place_id||"")}">${r.submitter_instagram?`<div class="meta">Submitted by ${esc(r.submitter_instagram)}</div>`:""}<div class="reject-box" id="rejectbox-${r.id}" hidden><label>Reject reason<select id="reason-${r.id}"><option>Unreadable thermometer</option><option>No thermometer visible</option><option>Submitted temperature does not match photo</option><option>Duplicate submission</option><option>Wrong location</option><option>Other</option></select></label><label>Optional detail<textarea id="rejectnotes-${r.id}"></textarea></label></div><div class="actions"><button class="danger" id="reject-${r.id}">Reject</button><button class="approve" id="approve-${r.id}" ${coords?"":"disabled"}>Approve</button></div></div></article>`;
 }
-
-function cardHtml(r,photoUrl) {
-  return `<article class="review-card" id="card-${r.id}">
-    <div class="photo-wrap">${photoUrl?`<img src="${escapeHtml(photoUrl)}" alt="Submitted thermometer evidence" onclick="window.open(this.src,'_blank')" />`:'<div class="photo-placeholder">Thermometer photo unavailable</div>'}</div>
-    <div class="review-body">
-      <div class="review-summary"><div><div class="submitted-label">Submitted</div><strong>${escapeHtml(r.bar_name)}</strong><div class="meta">${escapeHtml(r.beer_name)} · ${escapeHtml(formatWhen(r.measured_at))}</div></div><div class="submitted-temp">${Math.round(Number(r.temperature_f))}°F</div></div>
-      <div class="section-title">Review / correct before approval</div>
-      <div class="edit-grid">
-        <label class="wide">Bar / restaurant<input id="bar-${r.id}" value="${escapeHtml(r.bar_name)}" /></label>
-        <label class="wide">Street address<input id="address-${r.id}" value="${escapeHtml(r.address)}" /></label>
-        <label>City<input id="city-${r.id}" value="${escapeHtml(r.city)}" /></label>
-        <label>State<input id="state-${r.id}" value="${escapeHtml(r.state||'CA')}" /></label>
-        <label>Beer<input id="beer-${r.id}" value="${escapeHtml(r.beer_name)}" /></label>
-        <label>Temperature °F<input id="temp-${r.id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}" /></label>
-        <label class="wide">Measured at<input id="when-${r.id}" type="datetime-local" value="${escapeHtml(toLocalInput(r.measured_at))}" /></label>
-        <label class="wide">Notes<textarea id="notes-${r.id}">${escapeHtml(r.notes||'')}</textarea></label>
-      </div>
-      ${r.submitter_instagram?`<div class="meta">Submitted by ${escapeHtml(r.submitter_instagram)}</div>`:""}
-      <div class="meta" id="coordstatus-${r.id}" hidden></div>
-      <div class="reject-box" id="rejectbox-${r.id}" hidden>
-        <label>Reject reason<select id="reason-${r.id}"><option value="Unreadable thermometer">Unreadable thermometer</option><option value="No thermometer visible">No thermometer visible</option><option value="Submitted temperature does not match photo">Temperature doesn't match photo</option><option value="Duplicate submission">Duplicate submission</option><option value="Wrong location">Wrong location</option><option value="Other">Other</option></select></label>
-        <label>Optional detail<textarea id="rejectnotes-${r.id}" placeholder="Add details if useful"></textarea></label>
-      </div>
-      <div class="actions"><button class="danger" id="reject-${r.id}">Reject</button><button class="approve" id="approve-${r.id}" ${hasStoredCoords(r)?"":"disabled"}>Approve</button></div>
-    </div></article>`;
+function pendingEdited(r){return{bar_name:document.getElementById(`bar-${r.id}`).value.trim(),address:document.getElementById(`address-${r.id}`).value.trim(),city:document.getElementById(`city-${r.id}`).value.trim(),state:document.getElementById(`state-${r.id}`).value.trim()||"CA",beer_name:document.getElementById(`beer-${r.id}`).value.trim(),serve_type:document.getElementById(`serve-${r.id}`).value,temperature_f:Number(document.getElementById(`temp-${r.id}`).value),latitude:Number(document.getElementById(`lat-${r.id}`).value),longitude:Number(document.getElementById(`lng-${r.id}`).value),google_place_id:document.getElementById(`place-${r.id}`).value||null,measured_at:document.getElementById(`when-${r.id}`).value,notes:document.getElementById(`notes-${r.id}`).value.trim()||null}}
+function wirePending(r){
+  const lookup=document.getElementById(`venueLookup-${r.id}`);attachVenueLookup(lookup,p=>{document.getElementById(`bar-${r.id}`).value=p.name||"";document.getElementById(`address-${r.id}`).value=p.address||p.formattedAddress||"";document.getElementById(`city-${r.id}`).value=p.city||"";document.getElementById(`state-${r.id}`).value=p.state||"CA";document.getElementById(`lat-${r.id}`).value=p.lat;document.getElementById(`lng-${r.id}`).value=p.lng;document.getElementById(`place-${r.id}`).value=p.placeId||"";pendingCoords.set(r.id,{lat:Number(p.lat),lng:Number(p.lng),placeId:p.placeId});document.getElementById(`approve-${r.id}`).disabled=false});
+  document.getElementById(`approve-${r.id}`).onclick=()=>approvePending(r);document.getElementById(`reject-${r.id}`).onclick=()=>rejectPending(r)
 }
+async function approvePending(r){const e=pendingEdited(r);if(!southBay(e.latitude,e.longitude))return alert("Choose/correct a valid South Bay venue first.");if(!confirm(`Approve ${e.bar_name} — ${e.serve_type} ${e.beer_name} at ${e.temperature_f}°F?`))return;const card=document.getElementById(`card-${r.id}`);card.classList.add("busy");const{error}=await client.rpc("approve_submission_v3",{p_submission_id:r.id,p_latitude:e.latitude,p_longitude:e.longitude,p_google_place_id:e.google_place_id,p_bar_name:e.bar_name,p_address:e.address,p_city:e.city,p_state:e.state,p_beer_name:e.beer_name,p_serve_type:e.serve_type,p_temperature_f:e.temperature_f,p_measured_at:new Date(e.measured_at).toISOString(),p_notes:e.notes});if(error){card.classList.remove("busy");return alert(`Approval failed: ${error.message}`)}await loadQueue()}
+async function rejectPending(r){const box=document.getElementById(`rejectbox-${r.id}`),btn=document.getElementById(`reject-${r.id}`);if(box.hidden){box.hidden=false;btn.textContent="Confirm Reject";return}const reason=document.getElementById(`reason-${r.id}`).value,detail=document.getElementById(`rejectnotes-${r.id}`).value.trim(),note=detail?`${reason}: ${detail}`:reason;if(!confirm(`Reject this submission?\n\n${note}`))return;const{error}=await client.rpc("reject_submission",{p_submission_id:r.id,p_review_notes:note});if(error)return alert(error.message);await loadQueue()}
 
-function wireCard(r) {
-  document.getElementById(`approve-${r.id}`).addEventListener("click",()=>approveSubmission(r));
-  document.getElementById(`reject-${r.id}`).addEventListener("click",()=>toggleOrReject(r));
-
-  if (hasStoredCoords(r)) {
-    geocodes.set(r.id,{lat:Number(r.latitude),lng:Number(r.longitude)});
-  } else {
-    // Legacy submission from before venue coordinates were stored:
-    // resolve it automatically in the background instead of asking the admin
-    // to perform a second location check.
-    locateLegacySubmission(r);
-  }
+async function loadApproved(){
+  el.approvedList.innerHTML='<div class="empty">Loading approved readings…</div>';const q=el.approvedSearch.value.trim();const{data,error}=await client.rpc("admin_list_approved_readings_v1",{p_search:q||null});if(error){el.approvedList.innerHTML=`<div class="empty">Could not load approved entries: ${esc(error.message)}</div>`;return}const rows=Array.isArray(data)?data:[];const photos=await Promise.all(rows.map(r=>signedPhoto(r.photo_path)));el.approvedList.innerHTML=rows.length?rows.map((r,i)=>approvedCard(r,photos[i])).join(""):'<div class="empty">No matching approved readings.</div>';rows.forEach(wireApproved)
 }
+function approvedCard(r,photo){return `<article class="review-card approved-entry" id="approved-${r.reading_id}">${photo?`<div class="photo-wrap"><img src="${esc(photo)}" alt="Approved thermometer evidence"></div>`:""}<div class="review-body"><div class="review-summary"><div><div class="submitted-label">Approved reading</div><strong>${esc(r.bar_name)}</strong><div class="meta">${esc(r.serve_type||"Draft")} · ${esc(r.beer_name)} · ${esc(when(r.measured_at))}</div></div><div class="submitted-temp">${Math.round(Number(r.temperature_f))}°F</div></div><div class="edit-grid"><label class="wide">Bar / restaurant<input id="abar-${r.reading_id}" value="${esc(r.bar_name)}"></label><label class="wide">Street address<input id="aaddress-${r.reading_id}" value="${esc(r.address)}"></label><label>City<input id="acity-${r.reading_id}" value="${esc(r.city)}"></label><label>State<input id="astate-${r.reading_id}" value="${esc(r.state||"CA")}"></label><label>Beer<input id="abeer-${r.reading_id}" value="${esc(r.beer_name)}"></label><label>Served as<select id="aserve-${r.reading_id}"><option ${r.serve_type==="Draft"?"selected":""}>Draft</option><option ${r.serve_type==="Bottle"?"selected":""}>Bottle</option></select></label><label>Temperature °F<input id="atemp-${r.reading_id}" type="number" min="20" max="80" step="1" value="${Math.round(Number(r.temperature_f))}"></label><label>Latitude<input id="alat-${r.reading_id}" type="number" step="any" value="${r.latitude}"></label><label>Longitude<input id="alng-${r.reading_id}" type="number" step="any" value="${r.longitude}"></label><label class="wide">Measured at<input id="awhen-${r.reading_id}" type="datetime-local" value="${esc(localInput(r.measured_at))}"></label><label class="wide">Notes<textarea id="anotes-${r.reading_id}">${esc(r.notes||"")}</textarea></label></div><div class="venue-lookup" id="approvedLookup-${r.reading_id}"><label>Find/correct venue with Google Places<input class="venue-lookup-input" placeholder="Type venue name"></label><div class="venue-results"></div></div><input id="aplace-${r.reading_id}" type="hidden" value="${esc(r.google_place_id||"")}"><div class="actions"><button class="approve" id="save-${r.reading_id}">Save approved entry</button></div><div class="save-state" id="saveState-${r.reading_id}"></div></div></article>`}
+function wireApproved(r){const lookup=document.getElementById(`approvedLookup-${r.reading_id}`);attachVenueLookup(lookup,p=>{document.getElementById(`abar-${r.reading_id}`).value=p.name||"";document.getElementById(`aaddress-${r.reading_id}`).value=p.address||p.formattedAddress||"";document.getElementById(`acity-${r.reading_id}`).value=p.city||"";document.getElementById(`astate-${r.reading_id}`).value=p.state||"CA";document.getElementById(`alat-${r.reading_id}`).value=p.lat;document.getElementById(`alng-${r.reading_id}`).value=p.lng;document.getElementById(`aplace-${r.reading_id}`).value=p.placeId||""});document.getElementById(`save-${r.reading_id}`).onclick=()=>saveApproved(r)}
+async function saveApproved(r){const id=r.reading_id,payload={reading_id:String(id),bar_name:document.getElementById(`abar-${id}`).value.trim(),address:document.getElementById(`aaddress-${id}`).value.trim(),city:document.getElementById(`acity-${id}`).value.trim(),state:document.getElementById(`astate-${id}`).value.trim()||"CA",google_place_id:document.getElementById(`aplace-${id}`).value||null,latitude:Number(document.getElementById(`alat-${id}`).value),longitude:Number(document.getElementById(`alng-${id}`).value),beer_name:document.getElementById(`abeer-${id}`).value.trim(),serve_type:document.getElementById(`aserve-${id}`).value,temperature_f:Number(document.getElementById(`atemp-${id}`).value),measured_at:new Date(document.getElementById(`awhen-${id}`).value).toISOString(),notes:document.getElementById(`anotes-${id}`).value.trim()||null};if(!southBay(payload.latitude,payload.longitude))return alert("Invalid South Bay coordinates.");if(!confirm(`Save changes to this approved reading?`))return;const card=document.getElementById(`approved-${id}`);card.classList.add("busy");const{error}=await client.rpc("admin_update_approved_reading_v1",{p_payload:payload});card.classList.remove("busy");if(error)return alert(`Save failed: ${error.message}`);document.getElementById(`saveState-${id}`).textContent="Saved ✓";setTimeout(()=>loadApproved(),650)}
 
-function edited(r) {
-  return {
-    bar_name:document.getElementById(`bar-${r.id}`).value.trim(), address:document.getElementById(`address-${r.id}`).value.trim(),
-    city:document.getElementById(`city-${r.id}`).value.trim(), state:document.getElementById(`state-${r.id}`).value.trim()||"CA",
-    beer_name:document.getElementById(`beer-${r.id}`).value.trim(), temperature_f:Number(document.getElementById(`temp-${r.id}`).value),
-    measured_at:document.getElementById(`when-${r.id}`).value, notes:document.getElementById(`notes-${r.id}`).value.trim()||null
-  };
-}
-
-async function locateLegacySubmission(r) {
-  const e=edited(r);
-  const searches=[
-    `${e.bar_name}, ${e.address}, ${e.city}, ${e.state}, USA`,
-    `${e.bar_name}, ${e.city}, ${e.state}, USA`,
-    `${e.address}, ${e.city}, ${e.state}, USA`,
-    `${e.address}, ${e.city}, USA`
-  ];
-
-  try {
-    let result=null;
-    for (const search of searches) {
-      const params=new URLSearchParams({format:"jsonv2",limit:"1",countrycodes:"us",addressdetails:"1",q:search});
-      const response=await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`,{headers:{Accept:"application/json"}});
-      if (response.ok) {
-        const found=await response.json();
-        if (found&&found.length){result=found[0];break;}
-      }
-      await new Promise(resolve=>setTimeout(resolve,1100));
-    }
-
-    if(!result) throw new Error("Address not found");
-
-    const lat=Number(result.lat),lng=Number(result.lon);
-    if(!Number.isFinite(lat)||!Number.isFinite(lng) ||
-       lat < 33.55 || lat > 34.10 || lng < -118.75 || lng > -117.90) {
-      throw new Error("Invalid South Bay coordinates");
-    }
-
-    geocodes.set(r.id,{lat,lng});
-    document.getElementById(`approve-${r.id}`).disabled=false;
-  } catch(err) {
-    const status=document.getElementById(`coordstatus-${r.id}`);
-    status.hidden=false;
-    status.textContent="Could not verify this older submission's venue automatically. Check the address and refresh.";
-    status.style.color="#b42318";
-    status.style.fontWeight="800";
-  }
-}
-
-async function approveSubmission(r) {
-  const coords=geocodes.get(r.id),e=edited(r); if(!coords)return;
-  if(!e.bar_name||!e.address||!e.city||!e.beer_name||!e.measured_at||!Number.isInteger(e.temperature_f)||e.temperature_f<20||e.temperature_f>80){alert("Check the review fields. Bar, address, city, beer, date/time and a whole-number temperature from 20–80°F are required.");return;}
-  if(!confirm(`Approve ${e.bar_name} — ${e.beer_name} at ${e.temperature_f}°F?`))return;
-  const card=document.getElementById(`card-${r.id}`);card.classList.add("busy");
-  const {error}=await client.rpc("approve_submission_v2",{p_submission_id:r.id,p_latitude:coords.lat,p_longitude:coords.lng,p_bar_name:e.bar_name,p_address:e.address,p_city:e.city,p_state:e.state,p_beer_name:e.beer_name,p_temperature_f:e.temperature_f,p_measured_at:new Date(e.measured_at).toISOString(),p_notes:e.notes});
-  if(error){card.classList.remove("busy");alert(`Approval failed: ${error.message}`);return;} await loadQueue();
-}
-async function toggleOrReject(r) {
-  const box=document.getElementById(`rejectbox-${r.id}`),btn=document.getElementById(`reject-${r.id}`);
-  if(box.hidden){box.hidden=false;btn.textContent="Confirm Reject";return;}
-  const reason=document.getElementById(`reason-${r.id}`).value,detail=document.getElementById(`rejectnotes-${r.id}`).value.trim(); const reviewNotes=detail?`${reason}: ${detail}`:reason;
-  if(!confirm(`Reject this submission?\n\n${reviewNotes}`))return;
-  const card=document.getElementById(`card-${r.id}`);card.classList.add("busy");
-  const {error}=await client.rpc("reject_submission",{p_submission_id:r.id,p_review_notes:reviewNotes});
-  if(error){card.classList.remove("busy");alert(`Reject failed: ${error.message}`);return;} await loadQueue();
-}
-
-el.login.addEventListener("click",login); el.password.addEventListener("keydown",e=>{if(e.key==="Enter")login();}); el.signOut.addEventListener("click",signOut); checkAdmin();
+el.login.onclick=login;el.password.onkeydown=e=>{if(e.key==="Enter")login()};el.signOut.onclick=signOut;el.pendingTab.onclick=()=>setTab("pending");el.approvedTab.onclick=()=>setTab("approved");el.refreshPending.onclick=loadQueue;el.refreshApproved.onclick=loadApproved;el.approvedSearchBtn.onclick=loadApproved;el.approvedSearch.onkeydown=e=>{if(e.key==="Enter")loadApproved()};checkAdmin();

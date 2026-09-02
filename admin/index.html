@@ -2,43 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="robots" content="noindex,nofollow" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>SBSC Admin</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="admin-favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="admin-favicon-16x16.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="admin-favicon-180x180.png" />
   <link rel="stylesheet" href="admin.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <main class="admin-shell">
-    <header class="admin-head">
-      <div>
-        <div class="eyebrow">SBSC</div>
-        <h1>Submission Review</h1>
-        <p id="adminStatus">Sign in to review pending Coldies.</p>
-      </div>
-      <button id="signOut" class="secondary" hidden>Sign out</button>
-    </header>
-
+  <header class="admin-header">
+    <div><strong>SBSC Admin</strong><span id="adminStatus">Sign in to review Coldies.</span></div>
+    <button id="signOut" class="ghost" hidden>Sign out</button>
+  </header>
+  <main class="admin-main">
     <section id="loginPanel" class="panel login-panel">
-      <h2>Admin Login</h2>
-      <label>Email<input id="email" type="email" autocomplete="email" required /></label>
-      <label>Password<input id="password" type="password" autocomplete="current-password" required /></label>
+      <h1>Admin sign in</h1>
+      <label>Email<input id="email" type="email" autocomplete="username" /></label>
+      <label>Password<input id="password" type="password" autocomplete="current-password" /></label>
       <button id="login" class="primary">Sign in</button>
-      <div id="loginMessage" class="message" aria-live="polite"></div>
+      <div id="loginMessage" class="message"></div>
     </section>
 
     <section id="queuePanel" hidden>
-      <div class="queue-head">
-        <h2>Pending</h2>
-        <span id="pendingCount" class="count">0</span>
-      </div>
-      <div id="queue" class="queue"></div>
+      <nav class="tabs" aria-label="Admin sections">
+        <button id="pendingTab" class="tab active">Pending <span id="pendingCount">0</span></button>
+        <button id="approvedTab" class="tab">Approved Entries</button>
+      </nav>
+
+      <section id="pendingPanel">
+        <div class="section-head"><div><h1>Pending submissions</h1><p>Review evidence, correct details, then approve or reject.</p></div><button id="refreshPending" class="ghost">Refresh</button></div>
+        <div id="queue" class="review-list"></div>
+      </section>
+
+      <section id="approvedPanel" hidden>
+        <div class="section-head"><div><h1>Approved Entries</h1><p>Edit a bad venue, pin, temperature, serving type, or notes without rewriting unrelated history.</p></div><button id="refreshApproved" class="ghost">Refresh</button></div>
+        <div class="approved-search-row"><input id="approvedSearch" type="search" placeholder="Search venue, city, beer…" /><button id="approvedSearchBtn" class="primary">Search</button></div>
+        <div id="approvedList" class="review-list"></div>
+      </section>
     </section>
   </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin.js"></script>
 </body>
 </html>
