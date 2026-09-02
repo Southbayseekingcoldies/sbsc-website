@@ -106,6 +106,14 @@
           </label>
         </div>
 
+        <label class="serve-type-field">
+          <span>Served as</span>
+          <select id="serveType" name="serve_type" required>
+            <option value="Draft" selected>Draft</option>
+            <option value="Bottle">Bottle</option>
+          </select>
+        </label>
+
         <label><span>Thermometer photo <strong>required</strong></span><input id="photo" name="photo" type="file" accept="image/*" required /></label>
         <p class="photo-help">Photo should clearly show the beer and thermometer reading. Maximum 10 MB.</p>
 
@@ -122,6 +130,7 @@
         <input id="barAddress" name="address" type="hidden" />
         <input id="barCity" name="city" type="hidden" />
         <input id="barState" name="state" type="hidden" value="CA" />
+          <input id="googlePlaceId" name="google_place_id" type="hidden" value="" />
         <input id="measuredAt" name="measured_at" type="hidden" />
         <input id="websiteField" name="website" type="text" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
 

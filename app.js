@@ -35,7 +35,9 @@ const els = {
   barAddress: document.getElementById("barAddress"),
   barCity: document.getElementById("barCity"),
   barState: document.getElementById("barState"),
+  googlePlaceId: document.getElementById("googlePlaceId"),
   beerName: document.getElementById("beerName"),
+  serveType: document.getElementById("serveType"),
   temperatureF: document.getElementById("temperatureF"),
   measuredAt: document.getElementById("measuredAt"),
   photo: document.getElementById("photo"),
@@ -66,7 +68,9 @@ const CURATED_VENUES = [
     aliases: ["tranis dockside", "trani dockside", "tranis dockside station", "dockside station"],
     street: "311 E 22nd St",
     city: "San Pedro",
-    state: "CA"
+    state: "CA",
+    lat: 33.7270266,
+    lng: -118.27410
   },
   {
     name: "J. Trani's Ristorante",
@@ -80,6 +84,34 @@ const CURATED_VENUES = [
     aliases: ["tranis majestic", "trani majestic", "majestic trani", "majestic tranis"],
     street: "921 S Beacon St",
     city: "San Pedro",
+    state: "CA"
+  },
+  {
+    name: "DOGZ Bar and Grill",
+    aliases: ["dogz", "dogs", "dawgz", "dogz bar", "dogz grill", "dogz bar and grill", "dogs bar and grill"],
+    street: "5300 E 2nd St",
+    city: "Long Beach",
+    state: "CA"
+  },
+  {
+    name: "Quinn's Pub & Grill",
+    aliases: ["quinns", "quinn pub", "quinns pub", "quinns grill", "quinn pub and grill", "quinns pub and grill"],
+    street: "200 Nieto Ave Ste A",
+    city: "Long Beach",
+    state: "CA"
+  },
+  {
+    name: "Shannon's Bayshore",
+    aliases: ["shannons bayshore", "shannon bayshore", "shannons bay shore", "shannon's bayshore saloon"],
+    street: "5335 E 2nd St",
+    city: "Long Beach",
+    state: "CA"
+  },
+  {
+    name: "Legends Restaurant & Sports Bar",
+    aliases: ["legends", "legends sports bar", "legend sports bar"],
+    street: "5236 E 2nd St",
+    city: "Long Beach",
     state: "CA"
   }
 ];
@@ -157,9 +189,10 @@ function rebuildCityOptions() {
 }
 
 function markerColor(status) {
+  // Must exactly match the legend: blue / green / red.
   if (status.tier === "elite") return "#0a7cff";
-  if (status.tier === "pass") return "#12b7c8";
-  return "#ef4444";
+  if (status.tier === "pass") return "#32a85c";
+  return "#d71920";
 }
 
 function makeMarkerIcon(status) {
@@ -178,7 +211,10 @@ async function loadReadings() {
     .from("readings")
     .select(`
       id,
+      photo_path,
+      submission_id,
       beer_name,
+      serve_type,
       temperature_f,
       measured_at,
       notes,
@@ -209,6 +245,9 @@ async function loadReadings() {
     const bar = row.bars || {};
     return {
       id: row.id,
+      barId: String(bar.id || ""),
+      photoPath: row.photo_path || "",
+      photoUrl: "",
       bar: bar.name || "Unknown Bar",
       address: bar.address || "",
       city: bar.city || "",
@@ -216,11 +255,28 @@ async function loadReadings() {
       lat: Number(bar.latitude),
       lng: Number(bar.longitude),
       beer: row.beer_name || "Unknown Beer",
+      serveType: row.serve_type || "Draft",
       temp: roundTemp(row.temperature_f),
       measuredAt: row.measured_at,
       notes: row.notes || ""
     };
   }).filter(item => isSouthBayCoordinate(item.lat, item.lng) && Number.isFinite(item.temp));
+
+  // Approved submission photos remain in the private evidence bucket. Public
+  // visitors get short-lived signed URLs only for photo paths tied to approved
+  // readings. The storage policy in V7.0 limits anonymous SELECT to approved
+  // submission photos.
+  await Promise.all(readings.map(async reading => {
+    if (!reading.photoPath) return;
+    try {
+      const { data: signed } = await supabaseClient.storage
+        .from("submission-photos")
+        .createSignedUrl(reading.photoPath, 60 * 30);
+      reading.photoUrl = signed?.signedUrl || "";
+    } catch (error) {
+      console.warn("Could not sign approved photo", reading.id, error);
+    }
+  }));
 
   rebuildCityOptions();
   render();
@@ -281,6 +337,66 @@ function currentList() {
   return list;
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function locationKey(reading) {
+  return reading.barId || `${reading.bar}|${reading.address}|${reading.city}`;
+}
+
+function allReadingsForLocation(reading) {
+  const key = locationKey(reading);
+  return readings
+    .filter(r => locationKey(r) === key)
+    .map(r => ({ ...r, status: getStatus(r.temp) }));
+}
+
+function locationPopupHtml(reading) {
+  const history = allReadingsForLocation(reading)
+    .sort((a, b) => a.temp - b.temp || new Date(b.measuredAt) - new Date(a.measuredAt));
+  const best = history[0] || reading;
+  const photos = [...history]
+    .filter(r => r.photoUrl)
+    .sort((a, b) => new Date(b.measuredAt) - new Date(a.measuredAt))
+    .slice(0, 3);
+
+  const gallery = photos.length ? `
+    <div class="popup-gallery">
+      ${photos.map(p => `<a href="${escapeHtml(p.photoUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(p.photoUrl)}" alt="Approved thermometer photo from ${escapeHtml(p.bar)}"></a>`).join("")}
+    </div>` : `<div class="popup-photo-empty">No approved photos attached yet.</div>`;
+
+  const historyRows = history.map((r, index) => `
+    <div class="popup-history-row ${index === 0 ? "best" : ""}">
+      <div><strong>${formatTemp(r.temp)}</strong> · ${escapeHtml(r.serveType)} · ${escapeHtml(r.beer)}</div>
+      <div>${escapeHtml(formatDate(r.measuredAt))}${index === 0 ? " · BEST VERIFIED" : ""}</div>
+    </div>`).join("");
+
+  return `
+    <div class="popup-title">${escapeHtml(best.bar)}</div>
+    <div>${escapeHtml(best.city)}, ${escapeHtml(best.state)}</div>
+    <div class="popup-location-summary"><strong>Best verified:</strong> ${formatTemp(best.temp)} · ${displayJudgment(best.status, "map")}</div>
+    <div class="popup-reading-count">${history.length} verified reading${history.length === 1 ? "" : "s"} on record</div>
+    ${gallery}
+    <div class="popup-history-title">Reading history</div>
+    <div class="popup-history">${historyRows}</div>
+  `;
+}
+
+function locationGroupsForMap(displayedReadings) {
+  const groups = new Map();
+  displayedReadings.forEach(reading => {
+    const key = locationKey(reading);
+    if (!groups.has(key)) groups.set(key, reading);
+  });
+  return [...groups.values()];
+}
+
 function render() {
   filtered = currentList();
   updateStats(readings);
@@ -310,18 +426,21 @@ function render() {
     els.status.textContent = `Showing ${filtered.length} verified reading${filtered.length === 1 ? "" : "s"}.`;
   }
 
-  filtered.forEach(reading => {
-    const popup = `
-      <div class="popup-title">${reading.bar}</div>
-      <div>${reading.city}, ${reading.state}</div>
-      <div>${reading.beer}</div>
-      <div class="popup-temp">${formatTemp(reading.temp)}</div>
-      <div class="popup-judgment">${displayJudgment(reading.status, "map")}</div>
-    `;
-    const marker = L.marker([reading.lat, reading.lng], { icon: makeMarkerIcon(reading.status) }).addTo(map);
-    marker.bindPopup(popup);
+  // One marker per location. The dot is ranked by that location's BEST
+  // approved reading, while every historical reading remains stored and shown.
+  const mapLocations = locationGroupsForMap(filtered);
+  const markerByLocation = new Map();
+  mapLocations.forEach(locationReading => {
+    const history = allReadingsForLocation(locationReading)
+      .sort((a, b) => a.temp - b.temp || new Date(b.measuredAt) - new Date(a.measuredAt));
+    const best = history[0] || locationReading;
+    const marker = L.marker([best.lat, best.lng], { icon: makeMarkerIcon(best.status) }).addTo(map);
+    marker.bindPopup(locationPopupHtml(best), { maxWidth: 360, minWidth: 275 });
     markers.push(marker);
+    markerByLocation.set(locationKey(best), marker);
+  });
 
+  filtered.forEach(reading => {
     const article = document.createElement("article");
     article.className = "card";
     article.innerHTML = `
@@ -334,7 +453,9 @@ function render() {
         <div class="temp-chip ${reading.status.tier}">${formatTemp(reading.temp)}</div>
       </div>
       <div class="card-divider"></div>
-      <div class="beer-line"><strong>Beer:</strong> ${reading.beer}</div>
+      ${reading.photoUrl ? `<a class="reading-photo-link" href="${escapeHtml(reading.photoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img class="reading-photo-thumb" src="${escapeHtml(reading.photoUrl)}" alt="Approved thermometer photo"></a>` : ""}
+      <div class="beer-line"><strong>Beer:</strong> ${escapeHtml(reading.beer)}</div>
+      <div class="time-line"><strong>Served as:</strong> ${reading.serveType}</div>
       <div class="time-line"><strong>Measured:</strong> ${formatDate(reading.measuredAt)}</div>
       ${reading.distance != null ? `<div class="time-line"><strong>Distance:</strong> ${reading.distance.toFixed(1)} mi</div>` : ""}
       <div class="status-line"><strong>SBSC standard:</strong> 35°F or below</div>
@@ -343,7 +464,8 @@ function render() {
     `;
     article.addEventListener("click", () => {
       map.setView([reading.lat, reading.lng], 14);
-      marker.openPopup();
+      const marker = markerByLocation.get(locationKey(reading));
+      if (marker) marker.openPopup();
     });
     els.cards.appendChild(article);
   });
@@ -617,9 +739,49 @@ function uniqueSearchVariants(query) {
   return variants.slice(0, 3);
 }
 
+
+async function googleVenueSuggestions(query) {
+  const params = new URLSearchParams({ q: query });
+  if (userPosition) {
+    params.set("lat", String(userPosition.lat));
+    params.set("lng", String(userPosition.lng));
+  }
+  const response = await fetch(`/api/places-autocomplete?${params.toString()}`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return (data.suggestions || []).map(item => ({
+    name: item.mainText || item.text || query,
+    providerMeta: item.secondaryText || item.text || "Google Places",
+    googlePlaceId: item.placeId,
+    googleSuggestion: true,
+    matchScore: 110
+  }));
+}
+
+async function googlePlaceDetails(placeId) {
+  if (!placeId) return null;
+  const response = await fetch(`/api/place-details?id=${encodeURIComponent(placeId)}`);
+  if (!response.ok) return null;
+  const place = await response.json();
+  const lat = Number(place.lat);
+  const lng = Number(place.lng);
+  if (!isSouthBayCoordinate(lat, lng)) return null;
+  return {
+    name: place.name,
+    street: place.address,
+    city: place.city,
+    state: place.state || "CA",
+    lat, lng,
+    googlePlaceId: place.placeId,
+    providerMeta: place.formattedAddress || place.address || "Google Places",
+    googlePlace: true
+  };
+}
+
 function venueMeta(venue) {
   const bits = [];
   if (venue.matchHint) bits.push(`★ ${venue.matchHint}`);
+  if (venue.providerMeta) bits.push(venue.providerMeta);
   if (Number.isFinite(venue.distance)) bits.push(`${venue.distance.toFixed(1)} mi`);
   if (venue.street) bits.push(venue.street);
   if (venue.city) bits.push(venue.city);
@@ -732,6 +894,12 @@ async function chooseVenue(venue) {
   clearTimeout(venueSearchTimer);
 
   let resolvedVenue = { ...venue };
+
+  if (resolvedVenue.googlePlaceId && !Number.isFinite(Number(resolvedVenue.lat))) {
+    const googleDetails = await googlePlaceDetails(resolvedVenue.googlePlaceId);
+    if (googleDetails) resolvedVenue = { ...resolvedVenue, ...googleDetails };
+  }
+
   const hasCoords = Number.isFinite(Number(resolvedVenue.lat)) && Number.isFinite(Number(resolvedVenue.lng));
   if (!hasCoords && resolvedVenue.street && resolvedVenue.city) {
     resolvedVenue = await geocodeVenueAddress(resolvedVenue);
@@ -767,6 +935,7 @@ async function chooseVenue(venue) {
   els.barAddress.value = selectedVenue.address;
   els.barCity.value = selectedVenue.city || "South Bay";
   els.barState.value = selectedVenue.state || "CA";
+  if (els.googlePlaceId) els.googlePlaceId.value = selectedVenue.googlePlaceId || "";
   closeVenueResults();
   els.venueStatus.textContent = "";
   els.venueStatus.classList.add("selected");
@@ -825,6 +994,28 @@ async function searchVenueByName(term, requestId) {
     if (index === 0 && venue.matchScore < 100) venue.matchHint = "Best match";
   });
   if (instantMatches.length && requestId === venueSearchRequest && !selectedVenue) renderVenueResults(instantMatches.slice(0, 8));
+
+  // V7: Google Places is the primary venue directory. If the server-side key
+  // is configured, use Google's predictions and skip the unreliable free POI
+  // lookup. The existing curated/OSM system remains as an automatic fallback.
+  try {
+    const googleMatches = await googleVenueSuggestions(query);
+    if (requestId !== venueSearchRequest || selectedVenue) return;
+    if (googleMatches.length) {
+      const combinedGoogle = [];
+      const seenGoogle = new Set();
+      [...googleMatches, ...curatedMatches, ...localMatches].forEach(v => {
+        const key = v.googlePlaceId || `${normalizeVenueText(v.name)}|${v.street || ""}|${v.city || ""}`;
+        if (seenGoogle.has(key)) return;
+        seenGoogle.add(key);
+        combinedGoogle.push(v);
+      });
+      renderVenueResults(combinedGoogle.slice(0, 9));
+      return;
+    }
+  } catch (googleError) {
+    console.warn("Google Places unavailable; using fallback venue search.", googleError);
+  }
 
   try {
     const variants = uniqueSearchVariants(query);
@@ -1029,6 +1220,7 @@ function resetSubmissionForm() {
   selectedVenue = null;
   nearbyVenues = [];
   els.barState.value = "CA";
+  if (els.googlePlaceId) els.googlePlaceId.value = "";
   els.measuredAt.value = localDateTimeValue();
   venueSearchRequest += 1;
   clearTimeout(venueSearchTimer);
@@ -1160,9 +1352,11 @@ async function submitColdie(event) {
     address: els.barAddress.value.trim(),
     city: els.barCity.value.trim(),
     state: "CA",
+    google_place_id: selectedVenue.googlePlaceId || (els.googlePlaceId ? els.googlePlaceId.value : "") || null,
     latitude: venueLat,
     longitude: venueLng,
     beer_name: els.beerName.value.trim(),
+    serve_type: els.serveType.value || "Draft",
     temperature_f: temp,
     measured_at: measuredDate.toISOString(),
     photo_path: photoPath,
@@ -1204,6 +1398,7 @@ els.venueSearch.addEventListener("input", () => {
     els.barAddress.value = "";
     els.barCity.value = "";
     els.barState.value = "CA";
+    if (els.googlePlaceId) els.googlePlaceId.value = "";
     setVenueSelectionUI(false);
     els.venueStatus.classList.remove("selected");
     els.venueStatus.textContent = "";
