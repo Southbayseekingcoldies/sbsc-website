@@ -1,0 +1,33 @@
+SBSC V7.1 — PUBLIC SUBMISSION FIX
+
+WHAT THIS FIXES
+1. iPhone/Safari venue suggestions can now be selected reliably.
+2. Selecting a Google/venue suggestion is no longer mandatory.
+3. If a venue cannot be locked in, the typed venue name can still be submitted.
+4. Manual/fallback submissions save without Google Place ID, address, city, latitude, or longitude so they can be corrected during admin review.
+5. Google Places API files remain on the current V7 setup, including the 50,000 m radius fix.
+
+UPLOAD THESE FILES TO THE SAME PATHS IN YOUR GITHUB REPO
+- /app.js
+- /index.html
+- /styles.css
+- /api/places-autocomplete.js
+- /api/place-details.js
+
+You can upload/replace all five. Only app.js contains the new form behavior; the other files are included so you have one clean current public-site package.
+
+DO NOT CHANGE
+- Vercel GOOGLE_MAPS_API_KEY environment variable
+- Google Places API restrictions
+- Supabase settings
+- admin folder
+
+AFTER UPLOAD
+1. Commit the replacements to main.
+2. Let Vercel redeploy automatically.
+3. On iPhone, force-refresh/reopen southbaycoldies.com.
+4. Test A: type a venue, tap a suggestion, verify it locks in, then submit.
+5. Test B: type a made-up/manual venue name, do NOT select a suggestion, and submit. It should go to Pending instead of blocking you.
+
+NOTE
+Manual fallback submissions intentionally have blank location metadata. Resolve the venue/location in Admin before approving it to the public map.

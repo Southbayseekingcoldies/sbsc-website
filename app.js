@@ -821,7 +821,12 @@ function renderVenueResults(list) {
       ? "📍 Use this name at my current location"
       : venueMeta(venue);
     button.innerHTML = `<span class="venue-option-name">${escapeHtml(venue.name)}</span><span class="venue-option-meta">${escapeHtml(meta)}</span>`;
-    button.addEventListener("click", () => chooseVenue(venue));
+    // Use pointerdown instead of click so iPhone/Safari cannot blur the
+    // venue field and close the dropdown before the selection is committed.
+    button.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      chooseVenue(venue);
+    });
     els.venueResults.appendChild(button);
   });
   els.venueResults.classList.add("open");
@@ -1272,16 +1277,22 @@ async function submitColdie(event) {
 
   if (!els.form.reportValidity()) return;
 
-  if (!selectedVenue || !els.barName.value.trim()) {
-    showSubmitMessage("Choose the bar or restaurant from the venue suggestions first.");
+  // Google/venue selection is preferred, but it is NOT required.
+  // A legitimate reading must still be submittable when a venue is missing
+  // from search or mobile selection fails. Admin can resolve the location.
+  const typedVenueName = els.venueSearch.value.trim();
+  if (!typedVenueName) {
+    showSubmitMessage("Enter the bar or restaurant name.");
     els.venueSearch.focus();
     return;
   }
 
-  const venueLat = Number(selectedVenue.lat);
-  const venueLng = Number(selectedVenue.lng);
-  if (!isSouthBayCoordinate(venueLat, venueLng)) {
-    showSubmitMessage("That venue is missing a valid South Bay map location. Please choose it again from the suggestions.");
+  const hasSelectedVenue = Boolean(selectedVenue);
+  const venueLat = hasSelectedVenue ? Number(selectedVenue.lat) : null;
+  const venueLng = hasSelectedVenue ? Number(selectedVenue.lng) : null;
+
+  if (hasSelectedVenue && !isSouthBayCoordinate(venueLat, venueLng)) {
+    showSubmitMessage("That selected venue is missing a valid South Bay map location. Try selecting it again, or edit the venue name to submit it for admin review.");
     els.venueSearch.focus();
     return;
   }
@@ -1348,13 +1359,15 @@ async function submitColdie(event) {
 
   const instagram = els.instagram.value.trim().replace(/^@+/, "");
   const payload = {
-    bar_name: els.barName.value.trim(),
-    address: els.barAddress.value.trim(),
-    city: els.barCity.value.trim(),
+    bar_name: hasSelectedVenue ? (els.barName.value.trim() || typedVenueName) : typedVenueName,
+    address: hasSelectedVenue ? els.barAddress.value.trim() : "",
+    city: hasSelectedVenue ? els.barCity.value.trim() : "",
     state: "CA",
-    google_place_id: selectedVenue.googlePlaceId || (els.googlePlaceId ? els.googlePlaceId.value : "") || null,
-    latitude: venueLat,
-    longitude: venueLng,
+    google_place_id: hasSelectedVenue
+      ? (selectedVenue.googlePlaceId || (els.googlePlaceId ? els.googlePlaceId.value : "") || null)
+      : null,
+    latitude: hasSelectedVenue ? venueLat : null,
+    longitude: hasSelectedVenue ? venueLng : null,
     beer_name: els.beerName.value.trim(),
     serve_type: els.serveType.value || "Draft",
     temperature_f: temp,
