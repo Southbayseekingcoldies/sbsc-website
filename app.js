@@ -1,6 +1,7 @@
 
 const SUPABASE_URL = "https://horiiomkrvjtmcaoinlj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_0beNsBeuCwfaVbk8jGDWZg_nNiicK0O";
+const PRO_BEER_INSPECTOR_URL = "./data/pro-beer-inspector.json";
 const PASS_STANDARD = 35;
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -205,6 +206,61 @@ function makeMarkerIcon(status) {
   });
 }
 
+function normalizeSourceHandle(value = "") {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+}
+
+function readingSourceHtml(reading) {
+  const sourceName = reading.sourceName || "";
+  const sourceHandle = normalizeSourceHandle(reading.sourceHandle || "");
+  if (!sourceName && !sourceHandle) return "";
+
+  const label = sourceName && sourceHandle
+    ? `${escapeHtml(sourceName)} · ${escapeHtml(sourceHandle)}`
+    : escapeHtml(sourceName || sourceHandle);
+
+  if (reading.sourceUrl) {
+    return `<a href="${escapeHtml(reading.sourceUrl)}" target="_blank" rel="noopener">${label}</a>`;
+  }
+  return label;
+}
+
+async function loadProfessionalBeerInspectorReadings() {
+  try {
+    const response = await fetch(PRO_BEER_INSPECTOR_URL, { cache: "no-store" });
+    if (!response.ok) return [];
+    const payload = await response.json();
+    const items = Array.isArray(payload) ? payload : (payload.readings || []);
+
+    return items.map((row, index) => ({
+      id: row.id || `pbi-${index}`,
+      barId: row.barId || row.id || `pbi-${index}`,
+      photoPath: "",
+      photoUrl: row.photoUrl || "",
+      bar: row.bar || row.name || "Unknown Bar",
+      address: row.address || "",
+      city: row.city || "",
+      state: row.state || "CA",
+      lat: Number(row.lat ?? row.latitude),
+      lng: Number(row.lng ?? row.longitude),
+      beer: row.beer || row.beer_name || "Unknown Beer",
+      serveType: row.serveType || row.serve_type || "Draft",
+      temp: roundTemp(row.temp ?? row.temperature_f),
+      measuredAt: row.measuredAt || row.measured_at || new Date().toISOString(),
+      notes: row.notes || "Imported from Cold Beer Tracker",
+      source: row.source || "pro-beer-inspector",
+      sourceName: row.sourceName || "Professional Beer Inspector",
+      sourceHandle: row.sourceHandle || "",
+      sourceUrl: row.sourceUrl || ""
+    })).filter(item => isValidCoordinate(item.lat, item.lng) && Number.isFinite(item.temp));
+  } catch (error) {
+    console.warn("Could not load Professional Beer Inspector readings", error);
+    return [];
+  }
+}
+
 async function loadReadings() {
   els.status.textContent = "Loading live SBSC readings…";
   const { data, error } = await supabaseClient
@@ -232,16 +288,7 @@ async function loadReadings() {
     .eq("approved", true)
     .order("measured_at", { ascending: false });
 
-  if (error) {
-    console.error(error);
-    els.status.textContent = "Could not load readings from the SBSC database.";
-    els.cards.innerHTML = '<div class="empty">Database connection error. Check Supabase table permissions or query shape.</div>';
-    updateStats([]);
-    els.count.textContent = "0 results";
-    return;
-  }
-
-  readings = (data || []).map(row => {
+  const sbscReadings = error ? [] : (data || []).map(row => {
     const bar = row.bars || {};
     return {
       id: row.id,
@@ -258,7 +305,11 @@ async function loadReadings() {
       serveType: row.serve_type || "Draft",
       temp: roundTemp(row.temperature_f),
       measuredAt: row.measured_at,
-      notes: row.notes || ""
+      notes: row.notes || "",
+      source: "sbsc",
+      sourceName: "South Bay Seeking Coldies",
+      sourceHandle: "@SouthBayColdies",
+      sourceUrl: "https://www.instagram.com/southbaycoldies/"
     };
   }).filter(item => isValidCoordinate(item.lat, item.lng) && Number.isFinite(item.temp));
 
@@ -266,7 +317,7 @@ async function loadReadings() {
   // visitors get short-lived signed URLs only for photo paths tied to approved
   // readings. The storage policy in V7.0 limits anonymous SELECT to approved
   // submission photos.
-  await Promise.all(readings.map(async reading => {
+  await Promise.all(sbscReadings.map(async reading => {
     if (!reading.photoPath) return;
     try {
       const { data: signed } = await supabaseClient.storage
@@ -277,6 +328,19 @@ async function loadReadings() {
       console.warn("Could not sign approved photo", reading.id, error);
     }
   }));
+
+  const professionalReadings = await loadProfessionalBeerInspectorReadings();
+  readings = [...sbscReadings, ...professionalReadings]
+    .filter(item => isValidCoordinate(item.lat, item.lng) && Number.isFinite(item.temp));
+
+  if (error && !readings.length) {
+    console.error(error);
+    els.status.textContent = "Could not load readings from the SBSC database.";
+    els.cards.innerHTML = '<div class="empty">Database connection error. Check Supabase table permissions or query shape.</div>';
+    updateStats([]);
+    els.count.textContent = "0 results";
+    return;
+  }
 
   rebuildCityOptions();
   render();
@@ -382,6 +446,7 @@ function locationPopupHtml(reading) {
     <div>${escapeHtml(best.city)}, ${escapeHtml(best.state)}</div>
     <div class="popup-location-summary"><strong>Best verified:</strong> ${formatTemp(best.temp)} · ${displayJudgment(best.status, "map")}</div>
     <div class="popup-reading-count">${history.length} verified reading${history.length === 1 ? "" : "s"} on record</div>
+    ${readingSourceHtml(best) ? `<div class="popup-reading-count"><strong>Verified by:</strong> ${readingSourceHtml(best)}</div>` : ""}
     ${gallery}
     <div class="popup-history-title">Reading history</div>
     <div class="popup-history">${historyRows}</div>
@@ -457,6 +522,7 @@ function render() {
       <div class="beer-line"><strong>Beer:</strong> ${escapeHtml(reading.beer)}</div>
       <div class="time-line"><strong>Served as:</strong> ${reading.serveType}</div>
       <div class="time-line"><strong>Measured:</strong> ${formatDate(reading.measuredAt)}</div>
+      ${readingSourceHtml(reading) ? `<div class="time-line"><strong>Verified by:</strong> ${readingSourceHtml(reading)}</div>` : ""}
       ${reading.distance != null ? `<div class="time-line"><strong>Distance:</strong> ${reading.distance.toFixed(1)} mi</div>` : ""}
       <div class="status-line"><strong>SBSC standard:</strong> 35°F or below</div>
       <div class="judgment ${reading.status.tier === "fail" ? "fail" : "pass"}">${displayJudgment(reading.status, "card")}</div>

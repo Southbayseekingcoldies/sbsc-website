@@ -1,0 +1,11 @@
+{
+  "name": "sbsc-pbi-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:pbi": "node scripts/fetch-coldbeertracker.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}
