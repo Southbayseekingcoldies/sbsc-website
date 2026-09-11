@@ -1,1 +1,49 @@
+name: Sync Professional Beer Inspector
 
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 13 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Pull latest Cold Beer Tracker data
+        env:
+          PBI_SOURCE_URL: https://www.coldbeertracker.com/
+          PBI_SOURCE_NAME: Professional Beer Inspector
+          PBI_INSTAGRAM_HANDLE: ${{ vars.PBI_INSTAGRAM_HANDLE }}
+          PBI_INSTAGRAM_URL: ${{ vars.PBI_INSTAGRAM_URL }}
+        run: npm run sync:pbi
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/pro-beer-inspector.json data/pro-beer-inspector-geocode-cache.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Professional Beer Inspector data"
+            git push
+          fi
