@@ -13,13 +13,20 @@ const CACHE_FILE = path.join(DATA_DIR, 'pro-beer-inspector-geocode-cache.json');
 const SOURCE_URL = process.env.PBI_SOURCE_URL || 'https://www.coldbeertracker.com/';
 const SOURCE_NAME = process.env.PBI_SOURCE_NAME || 'Professional Beer Inspector';
 const SOURCE_HANDLE = normalizeHandle(process.env.PBI_INSTAGRAM_HANDLE || '');
-const SOURCE_INSTAGRAM_URL = process.env.PBI_INSTAGRAM_URL || '';
+const SOURCE_INSTAGRAM_URL = normalizeUrl(process.env.PBI_INSTAGRAM_URL || '');
 const USER_AGENT = 'SBSC Cold Beer Tracker importer bot/1.0 (+https://southbaycoldies.com)';
 
 function normalizeHandle(value = '') {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
   return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+}
+
+function normalizeUrl(value = '') {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/\//, '')}`;
 }
 
 async function readJson(filePath, fallback) {
@@ -143,21 +150,7 @@ function parseRecordsFromJsonPayloads(payloads) {
   return dedupeRecords(records);
 }
 
-async function autoScroll(page) {
-  let previousHeight = 0;
-  for (let i = 0; i < 18; i += 1) {
-    const height = await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-      return document.body.scrollHeight;
-    });
-    await page.waitForTimeout(900);
-    if (height === previousHeight) break;
-    previousHeight = height;
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
-}
-
-async function parseRecordsFromDom(page) {
+async function parseVisibleRecordsFromDom(page) {
   const raw = await page.evaluate(() => {
     const nodes = Array.from(document.querySelectorAll('div, article, section, li'));
     const seen = new Set();
@@ -173,7 +166,7 @@ async function parseRecordsFromDom(page) {
         .split('\n')
         .map(line => line.trim())
         .filter(Boolean)
-        .slice(0, 8);
+        .slice(0, 10);
 
       if (lines.length < 4) continue;
       const firstTempIndex = lines.findIndex(line => /^-?\d+(?:\.\d+)?(?:\s*°?F)?$/.test(line));
@@ -193,7 +186,57 @@ async function parseRecordsFromDom(page) {
     return rows;
   });
 
-  return dedupeRecords(raw.map((item, index) => normalizeRecord(item, index)).filter(Boolean));
+  return raw.map((item, index) => normalizeRecord(item, index)).filter(Boolean);
+}
+
+async function collectRecordsWhileScrolling(page) {
+  const collected = new Map();
+
+  const add = records => {
+    for (const record of records) {
+      const key = `${record.bar}|${record.city}|${record.state}|${record.temp}`.toLowerCase();
+      if (!collected.has(key)) collected.set(key, record);
+    }
+  };
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(700);
+  add(await parseVisibleRecordsFromDom(page));
+
+  // Step through the page instead of jumping straight to the bottom. This also
+  // works with virtualized lists that remove off-screen cards from the DOM.
+  let y = 0;
+  let stableRounds = 0;
+  let lastHeight = 0;
+  for (let i = 0; i < 160; i += 1) {
+    const metrics = await page.evaluate(() => ({
+      height: document.documentElement.scrollHeight,
+      viewport: window.innerHeight,
+      y: window.scrollY
+    }));
+
+    const step = Math.max(500, Math.floor(metrics.viewport * 0.72));
+    y = Math.min(metrics.height, metrics.y + step);
+    await page.evaluate(nextY => window.scrollTo(0, nextY), y);
+    await page.waitForTimeout(350);
+    add(await parseVisibleRecordsFromDom(page));
+
+    const after = await page.evaluate(() => ({
+      height: document.documentElement.scrollHeight,
+      viewport: window.innerHeight,
+      y: window.scrollY
+    }));
+
+    const atBottom = after.y + after.viewport >= after.height - 8;
+    if (atBottom && after.height === lastHeight) stableRounds += 1;
+    else stableRounds = 0;
+    lastHeight = after.height;
+
+    if (stableRounds >= 3) break;
+  }
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return [...collected.values()];
 }
 
 async function geocodeRecord(record, cache) {
@@ -256,14 +299,16 @@ async function scrapeColdBeerTracker() {
 
   await page.goto(SOURCE_URL, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForTimeout(2500);
-  await autoScroll(page);
-  await page.waitForTimeout(1500);
 
-  let records = parseRecordsFromJsonPayloads(jsonPayloads);
-  if (!records.length) {
-    records = await parseRecordsFromDom(page);
-  }
+  const domRecords = await collectRecordsWhileScrolling(page);
+  await page.waitForTimeout(1000);
+  const jsonRecords = parseRecordsFromJsonPayloads(jsonPayloads);
 
+  // Merge both sources. Some generated sites expose only a subset of records
+  // through JSON while rendering the rest into a virtualized list.
+  const records = dedupeRecords([...jsonRecords, ...domRecords]);
+
+  console.log(`Found ${jsonRecords.length} JSON records and ${domRecords.length} DOM records (${records.length} unique total).`);
   await browser.close();
   return records;
 }
