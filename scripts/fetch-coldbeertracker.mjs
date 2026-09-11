@@ -199,43 +199,101 @@ async function collectRecordsWhileScrolling(page) {
     }
   };
 
+  const collect = async () => add(await parseVisibleRecordsFromDom(page));
+
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(700);
-  add(await parseVisibleRecordsFromDom(page));
+  await page.waitForTimeout(500);
+  await collect();
 
-  // Step through the page instead of jumping straight to the bottom. This also
-  // works with virtualized lists that remove off-screen cards from the DOM.
-  let y = 0;
-  let stableRounds = 0;
-  let lastHeight = 0;
-  for (let i = 0; i < 160; i += 1) {
-    const metrics = await page.evaluate(() => ({
-      height: document.documentElement.scrollHeight,
-      viewport: window.innerHeight,
-      y: window.scrollY
+  // First try the document itself.
+  for (let i = 0; i < 120; i += 1) {
+    const before = await page.evaluate(() => ({
+      y: window.scrollY,
+      h: document.documentElement.scrollHeight,
+      vh: window.innerHeight
     }));
-
-    const step = Math.max(500, Math.floor(metrics.viewport * 0.72));
-    y = Math.min(metrics.height, metrics.y + step);
-    await page.evaluate(nextY => window.scrollTo(0, nextY), y);
-    await page.waitForTimeout(350);
-    add(await parseVisibleRecordsFromDom(page));
-
+    await page.evaluate(() => window.scrollBy(0, Math.max(450, Math.floor(window.innerHeight * 0.70))));
+    await page.waitForTimeout(250);
+    await collect();
     const after = await page.evaluate(() => ({
-      height: document.documentElement.scrollHeight,
-      viewport: window.innerHeight,
-      y: window.scrollY
+      y: window.scrollY,
+      h: document.documentElement.scrollHeight,
+      vh: window.innerHeight
     }));
-
-    const atBottom = after.y + after.viewport >= after.height - 8;
-    if (atBottom && after.height === lastHeight) stableRounds += 1;
-    else stableRounds = 0;
-    lastHeight = after.height;
-
-    if (stableRounds >= 3) break;
+    if (after.y === before.y && after.h === before.h) break;
   }
 
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // Generated/mobile-first sites often put the list inside a nested scrolling
+  // container. Find every vertically scrollable element and walk each one.
+  const scrollers = await page.evaluate(() => {
+    const all = Array.from(document.querySelectorAll('*'));
+    return all.map((el, index) => {
+      const style = getComputedStyle(el);
+      const overflowY = style.overflowY;
+      const scrollable = el.scrollHeight > el.clientHeight + 20 &&
+        ['auto', 'scroll', 'overlay'].includes(overflowY);
+      if (!scrollable) return null;
+      el.setAttribute('data-sbsc-scroller', String(index));
+      return {
+        id: String(index),
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight
+      };
+    }).filter(Boolean)
+      .sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight))
+      .slice(0, 12);
+  });
+
+  for (const scroller of scrollers) {
+    await page.evaluate(id => {
+      const el = document.querySelector(`[data-sbsc-scroller="${id}"]`);
+      if (el) el.scrollTop = 0;
+    }, scroller.id);
+    await page.waitForTimeout(250);
+    await collect();
+
+    let unchanged = 0;
+    let lastTop = -1;
+    for (let i = 0; i < 180; i += 1) {
+      const state = await page.evaluate(id => {
+        const el = document.querySelector(`[data-sbsc-scroller="${id}"]`);
+        if (!el) return null;
+        const step = Math.max(300, Math.floor(el.clientHeight * 0.70));
+        el.scrollTop = Math.min(el.scrollHeight, el.scrollTop + step);
+        return {
+          top: el.scrollTop,
+          height: el.scrollHeight,
+          client: el.clientHeight
+        };
+      }, scroller.id);
+      if (!state) break;
+      await page.waitForTimeout(250);
+      await collect();
+
+      if (state.top === lastTop) unchanged += 1;
+      else unchanged = 0;
+      lastTop = state.top;
+      if (unchanged >= 3 || state.top + state.client >= state.height - 5) {
+        // Give lazy loaders a couple extra chances at the bottom.
+        for (let j = 0; j < 3; j += 1) {
+          await page.waitForTimeout(500);
+          await collect();
+        }
+        break;
+      }
+    }
+  }
+
+  // Last-resort wheel scrolling catches custom/virtualized containers that do
+  // not advertise overflow in computed CSS.
+  const viewport = page.viewportSize() || { width: 1200, height: 800 };
+  await page.mouse.move(Math.floor(viewport.width / 2), Math.floor(viewport.height / 2));
+  for (let i = 0; i < 120; i += 1) {
+    await page.mouse.wheel(0, 900);
+    await page.waitForTimeout(220);
+    await collect();
+  }
+
   return [...collected.values()];
 }
 
@@ -334,13 +392,16 @@ async function main() {
   const output = {
     updated_at: new Date().toISOString(),
     source: SOURCE_URL,
+    scraped_count: records.length,
     count: enriched.length,
+    unmapped_count: Math.max(0, records.length - enriched.length),
     readings: enriched.sort((a, b) => a.temp - b.temp || a.bar.localeCompare(b.bar))
   };
 
   await writeJson(OUTPUT_FILE, output);
   await writeJson(CACHE_FILE, geocodeCache);
 
+  console.log(`Scraped ${records.length} total records; mapped ${enriched.length}; unmapped ${Math.max(0, records.length - enriched.length)}.`);
   console.log(`Wrote ${enriched.length} Professional Beer Inspector readings to ${OUTPUT_FILE}`);
 }
 
