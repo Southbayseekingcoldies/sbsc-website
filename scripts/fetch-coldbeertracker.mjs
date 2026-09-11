@@ -14,7 +14,9 @@ const SOURCE_URL = process.env.PBI_SOURCE_URL || 'https://www.coldbeertracker.co
 const SOURCE_NAME = process.env.PBI_SOURCE_NAME || 'Professional Beer Inspector';
 const SOURCE_HANDLE = normalizeHandle(process.env.PBI_INSTAGRAM_HANDLE || '');
 const SOURCE_INSTAGRAM_URL = normalizeUrl(process.env.PBI_INSTAGRAM_URL || '');
-const USER_AGENT = 'SBSC Cold Beer Tracker importer bot/1.0 (+https://southbaycoldies.com)';
+const USER_AGENT = 'SBSC Cold Beer Tracker importer bot/1.1 (+https://southbaycoldies.com)';
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
+
 
 function normalizeHandle(value = '') {
   const trimmed = String(value || '').trim();
@@ -297,11 +299,143 @@ async function collectRecordsWhileScrolling(page) {
   return [...collected.values()];
 }
 
-async function geocodeRecord(record, cache) {
+
+async function collectViaCitySearch(page) {
+  const collected = new Map();
+  const add = records => {
+    for (const record of records) {
+      const key = `${record.bar}|${record.city}|${record.state}|${record.temp}`.toLowerCase();
+      if (!collected.has(key)) collected.set(key, record);
+    }
+  };
+
+  const input = page.locator('input[placeholder*="Search city" i], input[aria-label*="Search city" i]').first();
+  if (await input.count() === 0) return [];
+
+  // A generated list can cap the blank/default view. Sweeping the public city
+  // filter exposes additional cards without needing private backend access.
+  const probes = [
+    ...'abcdefghijklmnopqrstuvwxyz',
+    'an','ar','be','bu','ca','ch','co','da','do','el','fo','fu','ga','ha','hu','ir','la','lo','mo','ne','no','or','pa','ra','ri','sa','se','si','st','ta','tu','we'
+  ];
+
+  for (const term of probes) {
+    try {
+      await input.fill(term);
+      await page.waitForTimeout(350);
+      add(await parseVisibleRecordsFromDom(page));
+
+      // Some result lists scroll inside a container after filtering.
+      for (let i = 0; i < 8; i += 1) {
+        await page.mouse.wheel(0, 850);
+        await page.waitForTimeout(120);
+        add(await parseVisibleRecordsFromDom(page));
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+    } catch (error) {
+      console.warn(`City search probe failed for "${term}":`, error.message);
+    }
+  }
+
+  try {
+    await input.fill('');
+    await page.waitForTimeout(300);
+  } catch {}
+
+  return [...collected.values()];
+}
+
+async function googleGeocodeRecord(record, cache) {
+  if (!GOOGLE_MAPS_API_KEY) return null;
   const query = [record.bar, record.city, record.state].filter(Boolean).join(', ');
-  const cacheKey = query.toLowerCase();
-  if (cache[cacheKey]?.lat && cache[cacheKey]?.lng) {
-    return { ...record, lat: cache[cacheKey].lat, lng: cache[cacheKey].lng };
+  const cacheKey = `google:${query.toLowerCase()}`;
+  if (cache[cacheKey]?.lat != null && cache[cacheKey]?.lng != null) {
+    return {
+      ...record,
+      lat: cache[cacheKey].lat,
+      lng: cache[cacheKey].lng,
+      address: record.address || cache[cacheKey].formattedAddress || '',
+      placeId: cache[cacheKey].placeId || '',
+      mapped: true,
+      mapSource: 'google-places'
+    };
+  }
+
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location'
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      maxResultCount: 3,
+      languageCode: 'en',
+      regionCode: 'US'
+    })
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Google Places HTTP ${response.status}: ${detail.slice(0, 240)}`);
+  }
+
+  const payload = await response.json();
+  const places = Array.isArray(payload.places) ? payload.places : [];
+  if (!places.length) return null;
+
+  const cityNeedle = record.city.toLowerCase();
+  const stateNeedle = record.state.toLowerCase();
+  const chosen = places.find(place => {
+    const addr = String(place.formattedAddress || '').toLowerCase();
+    return addr.includes(cityNeedle) && addr.includes(stateNeedle);
+  }) || places[0];
+
+  const lat = Number(chosen?.location?.latitude);
+  const lng = Number(chosen?.location?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  cache[cacheKey] = {
+    lat,
+    lng,
+    formattedAddress: chosen.formattedAddress || '',
+    placeId: chosen.id || '',
+    displayName: chosen.displayName?.text || ''
+  };
+
+  return {
+    ...record,
+    lat,
+    lng,
+    address: record.address || chosen.formattedAddress || '',
+    placeId: chosen.id || '',
+    mapped: true,
+    mapSource: 'google-places'
+  };
+}
+
+async function geocodeRecord(record, cache) {
+  // Google Places is the preferred resolver because bar/restaurant names are
+  // much more complete there than OSM. Nominatim remains a free fallback.
+  try {
+    const google = await googleGeocodeRecord(record, cache);
+    if (google) return google;
+  } catch (error) {
+    console.warn(`Google Places lookup failed for ${record.bar}:`, error.message);
+  }
+
+  const query = [record.bar, record.city, record.state].filter(Boolean).join(', ');
+  const cacheKey = `osm:${query.toLowerCase()}`;
+  if (cache[cacheKey]?.lat != null && cache[cacheKey]?.lng != null) {
+    return {
+      ...record,
+      lat: cache[cacheKey].lat,
+      lng: cache[cacheKey].lng,
+      address: record.address || cache[cacheKey].display_name || '',
+      mapped: true,
+      mapSource: 'openstreetmap'
+    };
   }
 
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
@@ -312,28 +446,26 @@ async function geocodeRecord(record, cache) {
     }
   });
 
-  if (!response.ok) {
-    throw new Error(`Geocoding failed for ${query}: HTTP ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Nominatim HTTP ${response.status}`);
   const results = await response.json();
   const first = Array.isArray(results) ? results[0] : null;
-  if (!first?.lat || !first?.lon) {
-    return null;
-  }
+  if (!first?.lat || !first?.lon) return null;
 
   const lat = Number(first.lat);
   const lng = Number(first.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-  cache[cacheKey] = {
+  cache[cacheKey] = { lat, lng, display_name: first.display_name || '' };
+  await new Promise(resolve => setTimeout(resolve, 1100));
+
+  return {
+    ...record,
     lat,
     lng,
-    display_name: first.display_name || ''
+    address: record.address || first.display_name || '',
+    mapped: true,
+    mapSource: 'openstreetmap'
   };
-
-  await new Promise(resolve => setTimeout(resolve, 1100));
-  return { ...record, lat, lng };
 }
 
 async function scrapeColdBeerTracker() {
@@ -359,14 +491,15 @@ async function scrapeColdBeerTracker() {
   await page.waitForTimeout(2500);
 
   const domRecords = await collectRecordsWhileScrolling(page);
+  const searchedRecords = await collectViaCitySearch(page);
   await page.waitForTimeout(1000);
   const jsonRecords = parseRecordsFromJsonPayloads(jsonPayloads);
 
-  // Merge both sources. Some generated sites expose only a subset of records
-  // through JSON while rendering the rest into a virtualized list.
-  const records = dedupeRecords([...jsonRecords, ...domRecords]);
+  // Merge every public surface we can observe: network JSON, the normal list,
+  // and records exposed through the site's own city-search control.
+  const records = dedupeRecords([...jsonRecords, ...domRecords, ...searchedRecords]);
 
-  console.log(`Found ${jsonRecords.length} JSON records and ${domRecords.length} DOM records (${records.length} unique total).`);
+  console.log(`Found ${jsonRecords.length} JSON records, ${domRecords.length} DOM records, and ${searchedRecords.length} search records (${records.length} unique total).`);
   await browser.close();
   return records;
 }
@@ -379,13 +512,33 @@ async function main() {
     throw new Error('No records were parsed from coldbeertracker.com.');
   }
 
-  const enriched = [];
+  const allReadings = [];
+  let mappedCount = 0;
+
   for (const record of records) {
     try {
       const geocoded = await geocodeRecord(record, geocodeCache);
-      if (geocoded) enriched.push(geocoded);
+      if (geocoded) {
+        mappedCount += 1;
+        allReadings.push(geocoded);
+      } else {
+        allReadings.push({
+          ...record,
+          lat: null,
+          lng: null,
+          mapped: false,
+          mapSource: null
+        });
+      }
     } catch (error) {
-      console.warn(`Skipping geocode for ${record.bar}:`, error.message);
+      console.warn(`Could not map ${record.bar}:`, error.message);
+      allReadings.push({
+        ...record,
+        lat: null,
+        lng: null,
+        mapped: false,
+        mapSource: null
+      });
     }
   }
 
@@ -393,16 +546,17 @@ async function main() {
     updated_at: new Date().toISOString(),
     source: SOURCE_URL,
     scraped_count: records.length,
-    count: enriched.length,
-    unmapped_count: Math.max(0, records.length - enriched.length),
-    readings: enriched.sort((a, b) => a.temp - b.temp || a.bar.localeCompare(b.bar))
+    count: allReadings.length,
+    mapped_count: mappedCount,
+    unmapped_count: Math.max(0, allReadings.length - mappedCount),
+    readings: allReadings.sort((a, b) => a.temp - b.temp || a.bar.localeCompare(b.bar))
   };
 
   await writeJson(OUTPUT_FILE, output);
   await writeJson(CACHE_FILE, geocodeCache);
 
-  console.log(`Scraped ${records.length} total records; mapped ${enriched.length}; unmapped ${Math.max(0, records.length - enriched.length)}.`);
-  console.log(`Wrote ${enriched.length} Professional Beer Inspector readings to ${OUTPUT_FILE}`);
+  console.log(`Scraped ${records.length} total records; mapped ${mappedCount}; preserved ${allReadings.length - mappedCount} unmapped.`);
+  console.log(`Wrote ${allReadings.length} Professional Beer Inspector readings to ${OUTPUT_FILE}`);
 }
 
 main().catch(error => {
