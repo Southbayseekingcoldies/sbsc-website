@@ -207,6 +207,13 @@ function makeMarkerIcon(status) {
   });
 }
 
+function markerZIndex(status) {
+  // Keep cold wins visible when markers overlap: blue above green above red.
+  if (status.tier === "elite") return 3000;
+  if (status.tier === "pass") return 2000;
+  return 1000;
+}
+
 function normalizeSourceHandle(value = "") {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
@@ -556,7 +563,10 @@ function render() {
     const history = allReadingsForLocation(group.representative)
       .sort((a, b) => a.temp - b.temp || new Date(b.measuredAt) - new Date(a.measuredAt));
     const best = history[0] || group.representative;
-    const marker = L.marker([best.lat, best.lng], { icon: makeMarkerIcon(best.status) }).addTo(map);
+    const marker = L.marker([best.lat, best.lng], {
+      icon: makeMarkerIcon(best.status),
+      zIndexOffset: markerZIndex(best.status)
+    }).addTo(map);
     marker.bindPopup(locationPopupHtml(best), { maxWidth: 360, minWidth: 275 });
     markers.push(marker);
     markerGroups.push({ representative: best, marker });
