@@ -148,20 +148,21 @@ function formatDate(value) {
 
 function getStatus(temp) {
   const t = roundTemp(temp);
-  if (t <= 30) return { tier: "elite", label: "PASS", message: `${Math.abs(PASS_STANDARD - t)}° below standard` };
-  if (t <= PASS_STANDARD) return { tier: "pass", label: "PASS", message: `${Math.abs(PASS_STANDARD - t)}° ${t === PASS_STANDARD ? "at standard" : "below standard"}` };
-  return { tier: "fail", label: "FAIL", message: `${t - PASS_STANDARD}° over standard` };
+  if (t <= 30) {
+    return { tier: "elite", label: "CERTIFIED ELITE COLDIE", mapLabel: "CERTIFIED ELITE COLDIES", icon: "🥶" };
+  }
+  if (t <= PASS_STANDARD) {
+    return { tier: "pass", label: "CERTIFIED COLDIE", mapLabel: "CERTIFIED COLDIES", icon: "✅" };
+  }
+  if (t >= 40) {
+    return { tier: "fail", variant: "soup", label: "FAIL — CERTIFIED SOUP", mapLabel: "FAIL — CERTIFIED SOUP", icon: "❌" };
+  }
+  return { tier: "fail", label: "FAIL", mapLabel: "FAILS", icon: "❌" };
 }
 
 function displayJudgment(status, surface = "card") {
-  if (status.tier === "fail") {
-    return `${status.label} · ${status.message.toUpperCase()}`;
-  }
-
-  // Successful pours get the SBSC hype treatment.
-  return surface === "map"
-    ? "CERTIFIED COLDIES ✅"
-    : "CERTIFIED COLDIES ✅🌡️❄️";
+  const label = surface === "map" ? status.mapLabel : status.label;
+  return `${label} ${status.icon}`;
 }
 
 function haversineMiles(a, b) {
@@ -245,6 +246,7 @@ async function loadProfessionalBeerInspectorReadings() {
       state: row.state || "CA",
       lat: Number(row.lat ?? row.latitude),
       lng: Number(row.lng ?? row.longitude),
+      googlePlaceId: row.placeId || row.googlePlaceId || row.google_place_id || "",
       beer: row.beer || row.beer_name || "Unknown Beer",
       serveType: row.serveType || row.serve_type || "Draft",
       temp: roundTemp(row.temp ?? row.temperature_f),
@@ -259,6 +261,17 @@ async function loadProfessionalBeerInspectorReadings() {
     console.warn("Could not load Professional Beer Inspector readings", error);
     return [];
   }
+}
+
+function syncMapLegendLabels() {
+  const legend = document.querySelector(".legend");
+  if (!legend) return;
+  legend.innerHTML = `
+    <span><i class="dot elite"></i> ≤30°F Certified Elite Coldies</span>
+    <span><i class="dot pass"></i> 31–35°F Certified Coldies</span>
+    <span><i class="dot fail"></i> 36–39°F Fails</span>
+    <span><i class="dot fail"></i> 40°F+ Fail — Certified Soup</span>
+  `;
 }
 
 async function loadReadings() {
@@ -282,7 +295,8 @@ async function loadReadings() {
         city,
         state,
         latitude,
-        longitude
+        longitude,
+        google_place_id
       )
     `)
     .eq("approved", true)
@@ -301,6 +315,7 @@ async function loadReadings() {
       state: bar.state || "CA",
       lat: Number(bar.latitude),
       lng: Number(bar.longitude),
+      googlePlaceId: bar.google_place_id || "",
       beer: row.beer_name || "Unknown Beer",
       serveType: row.serve_type || "Draft",
       temp: roundTemp(row.temperature_f),
@@ -410,14 +425,45 @@ function escapeHtml(value = "") {
     .replace(/'/g, "&#039;");
 }
 
+function normalizeVenueToken(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[’']/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+function sameVenue(a, b) {
+  const aPlace = String(a.googlePlaceId || "").trim();
+  const bPlace = String(b.googlePlaceId || "").trim();
+  if (aPlace && bPlace) return aPlace === bPlace;
+
+  const sameCity = normalizeVenueToken(a.city) === normalizeVenueToken(b.city);
+  const sameState = normalizeVenueToken(a.state || "CA") === normalizeVenueToken(b.state || "CA");
+  const sameName = normalizeVenueToken(a.bar) && normalizeVenueToken(a.bar) === normalizeVenueToken(b.bar);
+  if (sameName && sameCity && sameState) return true;
+
+  const aAddress = normalizeVenueToken(a.address);
+  const bAddress = normalizeVenueToken(b.address);
+  if (aAddress && bAddress && aAddress === bAddress && sameCity && sameState) return true;
+
+  if (sameName && isValidCoordinate(a.lat, a.lng) && isValidCoordinate(b.lat, b.lng)) {
+    return haversineMiles(a, b) <= 0.08;
+  }
+
+  return false;
+}
+
 function locationKey(reading) {
-  return reading.barId || `${reading.bar}|${reading.address}|${reading.city}`;
+  if (reading.googlePlaceId) return `place:${reading.googlePlaceId}`;
+  return `venue:${normalizeVenueToken(reading.bar)}|${normalizeVenueToken(reading.city)}|${normalizeVenueToken(reading.state || "CA")}`;
 }
 
 function allReadingsForLocation(reading) {
-  const key = locationKey(reading);
   return readings
-    .filter(r => locationKey(r) === key)
+    .filter(r => sameVenue(reading, r))
     .map(r => ({ ...r, status: getStatus(r.temp) }));
 }
 
@@ -435,18 +481,25 @@ function locationPopupHtml(reading) {
       ${photos.map(p => `<a href="${escapeHtml(p.photoUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(p.photoUrl)}" alt="Approved thermometer photo from ${escapeHtml(p.bar)}"></a>`).join("")}
     </div>` : `<div class="popup-photo-empty">No approved photos attached yet.</div>`;
 
-  const historyRows = history.map((r, index) => `
+  const historyRows = history.map((r, index) => {
+    const source = readingSourceHtml(r);
+    const timeText = r.source === "pro-beer-inspector"
+      ? "Professional Beer Inspector reading"
+      : escapeHtml(formatDate(r.measuredAt));
+    return `
     <div class="popup-history-row ${index === 0 ? "best" : ""}">
-      <div><strong>${formatTemp(r.temp)}</strong> · ${escapeHtml(r.serveType)} · ${escapeHtml(r.beer)}</div>
-      <div>${escapeHtml(formatDate(r.measuredAt))}${index === 0 ? " · BEST VERIFIED" : ""}</div>
-    </div>`).join("");
+      <div><strong>${formatTemp(r.temp)}</strong> · ${displayJudgment(r.status, "card")}</div>
+      <div>${escapeHtml(r.serveType)} · ${escapeHtml(r.beer)}</div>
+      <div>${timeText}${index === 0 ? " · BEST VERIFIED" : ""}</div>
+      ${source ? `<div><strong>Source:</strong> ${source}</div>` : ""}
+    </div>`;
+  }).join("");
 
   return `
     <div class="popup-title">${escapeHtml(best.bar)}</div>
     <div>${escapeHtml(best.city)}, ${escapeHtml(best.state)}</div>
     <div class="popup-location-summary"><strong>Best verified:</strong> ${formatTemp(best.temp)} · ${displayJudgment(best.status, "map")}</div>
     <div class="popup-reading-count">${history.length} verified reading${history.length === 1 ? "" : "s"} on record</div>
-    ${readingSourceHtml(best) ? `<div class="popup-reading-count"><strong>Verified by:</strong> ${readingSourceHtml(best)}</div>` : ""}
     ${gallery}
     <div class="popup-history-title">Reading history</div>
     <div class="popup-history">${historyRows}</div>
@@ -454,12 +507,16 @@ function locationPopupHtml(reading) {
 }
 
 function locationGroupsForMap(displayedReadings) {
-  const groups = new Map();
+  const groups = [];
   displayedReadings.forEach(reading => {
-    const key = locationKey(reading);
-    if (!groups.has(key)) groups.set(key, reading);
+    let group = groups.find(g => sameVenue(g.representative, reading));
+    if (!group) {
+      group = { representative: reading, readings: [] };
+      groups.push(group);
+    }
+    group.readings.push(reading);
   });
-  return [...groups.values()];
+  return groups;
 }
 
 function render() {
@@ -494,15 +551,15 @@ function render() {
   // One marker per location. The dot is ranked by that location's BEST
   // approved reading, while every historical reading remains stored and shown.
   const mapLocations = locationGroupsForMap(filtered);
-  const markerByLocation = new Map();
-  mapLocations.forEach(locationReading => {
-    const history = allReadingsForLocation(locationReading)
+  const markerGroups = [];
+  mapLocations.forEach(group => {
+    const history = allReadingsForLocation(group.representative)
       .sort((a, b) => a.temp - b.temp || new Date(b.measuredAt) - new Date(a.measuredAt));
-    const best = history[0] || locationReading;
+    const best = history[0] || group.representative;
     const marker = L.marker([best.lat, best.lng], { icon: makeMarkerIcon(best.status) }).addTo(map);
     marker.bindPopup(locationPopupHtml(best), { maxWidth: 360, minWidth: 275 });
     markers.push(marker);
-    markerByLocation.set(locationKey(best), marker);
+    markerGroups.push({ representative: best, marker });
   });
 
   filtered.forEach(reading => {
@@ -521,7 +578,7 @@ function render() {
       ${reading.photoUrl ? `<a class="reading-photo-link" href="${escapeHtml(reading.photoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img class="reading-photo-thumb" src="${escapeHtml(reading.photoUrl)}" alt="Approved thermometer photo"></a>` : ""}
       <div class="beer-line"><strong>Beer:</strong> ${escapeHtml(reading.beer)}</div>
       <div class="time-line"><strong>Served as:</strong> ${reading.serveType}</div>
-      <div class="time-line"><strong>Measured:</strong> ${formatDate(reading.measuredAt)}</div>
+      ${reading.source === "pro-beer-inspector" ? "" : `<div class="time-line"><strong>Measured:</strong> ${formatDate(reading.measuredAt)}</div>`}
       ${readingSourceHtml(reading) ? `<div class="time-line"><strong>Verified by:</strong> ${readingSourceHtml(reading)}</div>` : ""}
       ${reading.distance != null ? `<div class="time-line"><strong>Distance:</strong> ${reading.distance.toFixed(1)} mi</div>` : ""}
       <div class="status-line"><strong>SBSC standard:</strong> 35°F or below</div>
@@ -530,8 +587,8 @@ function render() {
     `;
     article.addEventListener("click", () => {
       map.setView([reading.lat, reading.lng], 14);
-      const marker = markerByLocation.get(locationKey(reading));
-      if (marker) marker.openPopup();
+      const markerGroup = markerGroups.find(group => sameVenue(group.representative, reading));
+      if (markerGroup) markerGroup.marker.openPopup();
     });
     els.cards.appendChild(article);
   });
@@ -1537,4 +1594,5 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshReadingsIfNeeded();
 });
 
+syncMapLegendLabels();
 refreshReadingsIfNeeded(true);
