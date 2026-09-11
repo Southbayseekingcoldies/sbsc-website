@@ -155,9 +155,9 @@ function getStatus(temp) {
     return { tier: "pass", label: "CERTIFIED COLDIE", mapLabel: "CERTIFIED COLDIES", icon: "✅" };
   }
   if (t >= 40) {
-    return { tier: "fail", variant: "soup", label: "FAIL — CERTIFIED SOUP", mapLabel: "FAIL — CERTIFIED SOUP", icon: "❌" };
+    return { tier: "fail", variant: "soup", label: "FAIL - CERTIFIED SOUP", mapLabel: "FAIL - CERTIFIED SOUP", icon: "🔥" };
   }
-  return { tier: "fail", label: "FAIL", mapLabel: "FAIL", icon: "❌" };
+  return { tier: "fail", variant: "sweatin", label: "FAIL - SWEATIN'", mapLabel: "FAIL - SWEATIN'", icon: "🥵" };
 }
 
 function displayJudgment(status, surface = "card") {
@@ -276,8 +276,8 @@ function syncMapLegendLabels() {
   legend.innerHTML = `
     <span><i class="dot elite"></i> ≤30°F Certified Elite Coldies</span>
     <span><i class="dot pass"></i> 31–35°F Certified Coldies</span>
-    <span><i class="dot fail"></i> 36–39°F Fail</span>
-    <span><i class="dot fail"></i> 40°F+ Fail — Certified Soup 🥵</span>
+    <span><i class="dot fail"></i> 36–39°F Fail - Sweatin' 🥵</span>
+    <span><i class="dot fail"></i> 40°F+ Fail - Certified Soup 🔥</span>
   `;
 }
 
