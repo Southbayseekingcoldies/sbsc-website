@@ -1,1 +1,22 @@
-{}
+{
+  "ojos locos, chino, ca": {
+    "lat": 34.0331867,
+    "lng": -117.6854423,
+    "display_name": "Ojos Locos Sports Cantina, Philadelphia Street, Chino, San Bernardino County, California, 91710, United States"
+  },
+  "ojos locos, downey, ca": {
+    "lat": 33.9388759,
+    "lng": -118.1320334,
+    "display_name": "Ojos Locos Sports Cantina, Dolan Avenue, Downey, Los Angeles County, California, 90241, United States"
+  },
+  "paul's cocktails, orange, ca": {
+    "lat": 33.788027,
+    "lng": -117.8545228,
+    "display_name": "Paul's Cocktails, West Chapman Avenue, Plaza Historic District, Orange, Orange County, California, 92866, United States"
+  },
+  "the post, villa park, ca": {
+    "lat": 33.8150447,
+    "lng": -117.8204703,
+    "display_name": "The Post, 17855, Santiago Boulevard, Villa Park, Orange County, California, 92861, United States"
+  }
+}
