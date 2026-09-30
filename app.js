@@ -943,6 +943,14 @@ function renderVenueResults(list) {
   }
 
   els.venueResults.innerHTML = "";
+  // Keep the suggestion list independently scrollable on iPhone/Safari.
+  Object.assign(els.venueResults.style, {
+    maxHeight: "42vh",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    touchAction: "pan-y",
+    WebkitOverflowScrolling: "touch"
+  });
   if (!list.length) {
     els.venueResults.innerHTML = '<div class="venue-empty">No close match yet. Keep typing — we’ll keep looking.</div>';
     els.venueResults.classList.add("open");
@@ -959,12 +967,48 @@ function renderVenueResults(list) {
       ? "📍 Use this name at my current location"
       : venueMeta(venue);
     button.innerHTML = `<span class="venue-option-name">${escapeHtml(venue.name)}</span><span class="venue-option-meta">${escapeHtml(meta)}</span>`;
-    // Use pointerdown instead of click so iPhone/Safari cannot blur the
-    // venue field and close the dropdown before the selection is committed.
+    // Mobile-safe tap handling: touching a row must NOT immediately select it.
+    // Let vertical finger movement scroll the results; select only when the
+    // pointer is released without a meaningful drag.
+    let pointerStart = null;
+    let pointerMoved = false;
+
     button.addEventListener("pointerdown", event => {
+      pointerStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      pointerMoved = false;
+    });
+
+    button.addEventListener("pointermove", event => {
+      if (!pointerStart || event.pointerId !== pointerStart.id) return;
+      const dx = event.clientX - pointerStart.x;
+      const dy = event.clientY - pointerStart.y;
+      if (Math.hypot(dx, dy) > 10) pointerMoved = true;
+    });
+
+    button.addEventListener("pointercancel", () => {
+      pointerStart = null;
+      pointerMoved = false;
+    });
+
+    button.addEventListener("pointerup", event => {
+      if (!pointerStart || event.pointerId !== pointerStart.id) return;
+      const shouldChoose = !pointerMoved;
+      pointerStart = null;
+      pointerMoved = false;
+      if (!shouldChoose) return;
       event.preventDefault();
       chooseVenue(venue);
     });
+
+    // Keyboard accessibility without creating a second touch selection path.
+    button.addEventListener("click", event => {
+      if (event.detail !== 0) {
+        event.preventDefault();
+        return;
+      }
+      chooseVenue(venue);
+    });
+
     els.venueResults.appendChild(button);
   });
   els.venueResults.classList.add("open");
