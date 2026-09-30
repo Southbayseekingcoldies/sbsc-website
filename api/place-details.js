@@ -4,7 +4,7 @@ function component(components, type, preferShort = false) {
   return preferShort ? (item.shortText || item.longText || "") : (item.longText || item.shortText || "");
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) return res.status(503).json({ error: "Google Places is not configured" });
