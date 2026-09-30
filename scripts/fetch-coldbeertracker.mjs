@@ -102,21 +102,44 @@ function dedupeRecords(items) {
 }
 
 function normalizeRecord(raw, index = 0) {
-  const bar = cleanText(raw.bar || raw.name || raw.venue || raw.location || raw.title);
-  const city = cleanText(raw.city || raw.town || raw.locality);
-  const state = titleCaseState(raw.state || raw.region || raw.province || 'CA');
-  const temp = parseTemp(raw.temp ?? raw.temperature ?? raw.temperature_f ?? raw.value);
+  // Cold Beer Tracker's Softr datasource currently returns capitalized field
+  // names such as Bar / City / State / Temp. Support both those and the older
+  // lower-case variants.
+  const bar = cleanText(
+    raw.bar || raw.Bar ||
+    raw.name || raw.Name ||
+    raw.venue || raw.Venue ||
+    raw.location || raw.Location ||
+    raw.title || raw.Title
+  );
+  const city = cleanText(
+    raw.city || raw.City ||
+    raw.town || raw.Town ||
+    raw.locality || raw.Locality
+  );
+  const state = titleCaseState(
+    raw.state || raw.State ||
+    raw.region || raw.Region ||
+    raw.province || raw.Province ||
+    'CA'
+  );
+  const temp = parseTemp(
+    raw.temp ?? raw.Temp ??
+    raw.temperature ?? raw.Temperature ??
+    raw.temperature_f ?? raw.Temperature_F ??
+    raw.value ?? raw.Value
+  );
   if (!bar || !city || !looksLikeState(state) || temp == null) return null;
 
   return {
     id: `pbi-${slugify(`${bar}-${city}-${state}-${temp}`) || index}`,
     bar,
-    address: cleanText(raw.address || ''),
+    address: cleanText(raw.address || raw.Address || ''),
     city,
     state,
     temp,
-    beer: cleanText(raw.beer || raw.beer_name || 'Unknown Beer'),
-    serveType: cleanText(raw.serveType || raw.serve_type || 'Draft'),
+    beer: cleanText(raw.beer || raw.Beer || raw.beer_name || raw.Beer_Name || 'Unknown Beer'),
+    serveType: cleanText(raw.serveType || raw.ServeType || raw.serve_type || raw.Serve_Type || 'Draft'),
     notes: cleanText(raw.notes || 'Imported from coldbeertracker.com'),
     measuredAt: raw.measuredAt || raw.measured_at || new Date().toISOString(),
     source: 'pro-beer-inspector',
