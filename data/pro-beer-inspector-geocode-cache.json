@@ -795,5 +795,166 @@
     "formattedAddress": "1501 W Orangewood Ave Ste. 101, Orange, CA 92868",
     "placeId": "ChIJzVe4kyzX3IARqSfz-DGX3SU",
     "displayName": "everywhere"
+  },
+  "google:saddle bar, solana beach, ca": {
+    "lat": 32.9913144,
+    "lng": -117.27217490000001,
+    "formattedAddress": "123 Plaza St, Solana Beach, CA 92075",
+    "placeId": "ChIJHVZ79c0O3IARDoVPud7Tf04",
+    "displayName": "Saddle Bar"
+  },
+  "google:bottoms up, anaheim, ca": {
+    "lat": 33.832038499999996,
+    "lng": -117.9576673,
+    "formattedAddress": "2162 W Lincoln Ave, Anaheim, CA 92801",
+    "placeId": "ChIJX479sJcp3YARjk7TM8eP8FE",
+    "displayName": "Bottoms Up Tavern"
+  },
+  "google:the leaky tiki, la habra, ca": {
+    "lat": 33.9317111,
+    "lng": -117.9434118,
+    "formattedAddress": "280 E La Habra Blvd, La Habra, CA 90631",
+    "placeId": "ChIJt6f-prYq3YAR0begmys3BwE",
+    "displayName": "Leaky Tiki Bar"
+  },
+  "google:shakas, la habra, ca": {
+    "lat": 33.9387081,
+    "lng": -117.93945090000001,
+    "formattedAddress": "632 E Whittier Blvd, La Habra, CA 90631",
+    "placeId": "ChIJf_D9vZzVwoARZFmztGteRbk",
+    "displayName": "Shakas Cocktail Bar"
+  },
+  "google:the brass tap, corona, ca": {
+    "lat": 33.8899389,
+    "lng": -117.5634862,
+    "formattedAddress": "705 N Main St Suite 103, Corona, CA 92878",
+    "placeId": "ChIJaxCTDnTJ3IARGklF5lbHCmE",
+    "displayName": "The Brass Tap"
+  },
+  "google:the office, encinitas, ca": {
+    "lat": 33.0208243,
+    "lng": -117.2817104,
+    "formattedAddress": "110 Aberdeen Dr # A, Cardiff, CA 92007",
+    "placeId": "ChIJLRDkYh0M3IARoyJkY6EnkAk",
+    "displayName": "The Cardiff Office"
+  },
+  "google:mr. peabody's, encinitas, ca": {
+    "lat": 33.0498185,
+    "lng": -117.28949289999998,
+    "formattedAddress": "136 Encinitas Blvd, Encinitas, CA 92024",
+    "placeId": "ChIJH9WYa2gM3IARViPJZiRY1ls",
+    "displayName": "Mr. Peabody's Bar & Grill Live Music"
+  },
+  "google:shanty, encinitas, ca": {
+    "lat": 33.0200442,
+    "lng": -117.28113660000001,
+    "formattedAddress": "126 Chesterfield Dr, Cardiff, CA 92007",
+    "placeId": "ChIJdXpIjKcO3IARKVHMQ39TaTg",
+    "displayName": "The Shanty"
+  },
+  "google:class of 47, newport beach, ca": {
+    "lat": 33.6030552,
+    "lng": -117.9007584,
+    "formattedAddress": "209 Palm St, Newport Beach, CA 92661",
+    "placeId": "ChIJ6Sl5r2zg3IARyPsryY2GgNk",
+    "displayName": "Class of 47"
+  },
+  "google:the chowder barge, wilmington, ca": {
+    "lat": 33.7770636,
+    "lng": -118.24266549999999,
+    "formattedAddress": "611 N Henry Ford Ave, Wilmington, CA 90744",
+    "placeId": "ChIJb2W0GoM23YARIja9p-RKHz0",
+    "displayName": "Chowder Barge"
+  },
+  "google:blondie's saloon, orange, ca": {
+    "lat": 33.7888744,
+    "lng": -117.816699,
+    "formattedAddress": "3425 E Chapman Ave, Orange, CA 92869",
+    "placeId": "ChIJBUyT1Rba3IARwlyXAuO-neA",
+    "displayName": "Blondie's Saloon"
+  },
+  "google:lona's city limits, long beach, ca": {
+    "lat": 33.8187545,
+    "lng": -118.17698229999999,
+    "formattedAddress": "1174 E Wardlow Rd, Long Beach, CA 90807",
+    "placeId": "ChIJSyIITL8z3YARYG4ASo_JM-M",
+    "displayName": "Lona's City Limits Cantina"
+  },
+  "google:ole's tavern, san clemente, ca": {
+    "lat": 33.427099,
+    "lng": -117.611991,
+    "formattedAddress": "127 S El Camino Real, San Clemente, CA 92672",
+    "placeId": "ChIJH9_892703IAR16r086lrdig",
+    "displayName": "Ole's Tavern"
+  },
+  "google:three13 bar, costa mesa, ca": {
+    "lat": 33.6435252,
+    "lng": -117.93294600000002,
+    "formattedAddress": "820 W 19th St, Costa Mesa, CA 92627",
+    "placeId": "ChIJxakAnHsh3YARDGLsc0JjWdQ",
+    "displayName": "Three-13 Bar"
+  },
+  "google:pitstop pub, menifee, ca": {
+    "lat": 33.6853706,
+    "lng": -117.19041519999999,
+    "formattedAddress": "26900 Newport Rd, Menifee, CA 92584",
+    "placeId": "ChIJiWjISpOd3IAR6GMz67ykMGo",
+    "displayName": "Pitstop Pub Sports Bar & Grill"
+  },
+  "google:the stand, whittier, ca": {
+    "lat": 33.9601624,
+    "lng": -118.0269199,
+    "formattedAddress": "13815 Whittier Blvd, Whittier, CA 90605",
+    "placeId": "ChIJVfclZ9LTwoARSpC9HvflKGk",
+    "displayName": "The Stand - American Classics Redefined"
+  },
+  "google:olive pit, orange, ca": {
+    "lat": 33.8359026,
+    "lng": -117.84481249999997,
+    "formattedAddress": "834 Lincoln Ave # B, Orange, CA 92865",
+    "placeId": "ChIJPTp_uSfX3IARabvlY0HaFVs",
+    "displayName": "The Olive Pit"
+  },
+  "google:sportsman, corona, ca": {
+    "lat": 33.8263969,
+    "lng": -117.51717079999999,
+    "formattedAddress": "2585 Tuscany St, Corona, CA 92881",
+    "placeId": "ChIJCyiN1uy53IARGrMw_9W3VVc",
+    "displayName": "Sportsman's Warehouse"
+  },
+  "google:marty's, orange, ca": {
+    "lat": 33.817008099999995,
+    "lng": -117.83636580000001,
+    "formattedAddress": "1766 N Tustin St, Orange, CA 92865",
+    "placeId": "ChIJqeDlM0rX3IARzhpyDmExYUQ",
+    "displayName": "Marty's Cocktails"
+  },
+  "google:the bench, fullerton, ca": {
+    "lat": 33.889456599999995,
+    "lng": -117.87011009999999,
+    "formattedAddress": "3159 Yorba Linda Blvd, Fullerton, CA 92831",
+    "placeId": "ChIJD9hOvjbU3IAR1ZbgDmyD5Ck",
+    "displayName": "The Bench Sports Bar & Grill"
+  },
+  "google:the pump room, orange, ca": {
+    "lat": 33.7874458,
+    "lng": -117.8692363,
+    "formattedAddress": "1532 W Chapman Ave, Orange, CA 92868",
+    "placeId": "ChIJ0R9A_dbZ3IARQfwcrvYBJjc",
+    "displayName": "The Pump Room"
+  },
+  "google:pub 33, costa mesa, ca": {
+    "lat": 33.631824,
+    "lng": -117.9230969,
+    "formattedAddress": "1562 Newport Blvd, Costa Mesa, CA 92627",
+    "placeId": "ChIJH3r1FfXf3IAR0sMNAf_yQPs",
+    "displayName": "Turner's Pub 33"
+  },
+  "google:49rs tavern, long beach, ca": {
+    "lat": 33.774260999999996,
+    "lng": -118.12184590000001,
+    "formattedAddress": "5660 CA-1 Ste A, Long Beach, CA 90814",
+    "placeId": "ChIJ90rmL9Ix3YARH1FOG6pvnbs",
+    "displayName": "49rs Tavern"
   }
 }
