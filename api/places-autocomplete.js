@@ -23,7 +23,8 @@ module.exports = async function handler(req, res) {
           "suggestions.placePrediction.placeId",
           "suggestions.placePrediction.text.text",
           "suggestions.placePrediction.structuredFormat.mainText.text",
-          "suggestions.placePrediction.structuredFormat.secondaryText.text"
+          "suggestions.placePrediction.structuredFormat.secondaryText.text",
+          "suggestions.placePrediction.distanceMeters"
         ].join(",")
       },
       body: JSON.stringify({
@@ -36,7 +37,8 @@ module.exports = async function handler(req, res) {
             center,
             radius: 50000
           }
-        }
+        },
+        origin: center
       })
     });
 
@@ -56,9 +58,13 @@ module.exports = async function handler(req, res) {
         placeId: p.placeId,
         text: p.text?.text || "",
         mainText: p.structuredFormat?.mainText?.text || p.text?.text || "",
-        secondaryText: p.structuredFormat?.secondaryText?.text || p.text?.text || ""
+        secondaryText: p.structuredFormat?.secondaryText?.text || p.text?.text || "",
+        distanceMeters: Number.isFinite(Number(p.distanceMeters)) ? Number(p.distanceMeters) : null
       }))
-      .filter(p => p.placeId && p.mainText);
+      .filter(p => p.placeId && p.mainText)
+      // Hard safety net: when the browser supplied a real location, never show
+      // a prediction more than 50 km away even if Google ranks it oddly.
+      .filter(p => !Number.isFinite(lat) || !Number.isFinite(lng) || p.distanceMeters == null || p.distanceMeters <= 50000);
 
     return res.status(200).json({ suggestions });
   } catch (error) {
