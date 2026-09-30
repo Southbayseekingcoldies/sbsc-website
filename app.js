@@ -1,7 +1,7 @@
 
 const SUPABASE_URL = "https://horiiomkrvjtmcaoinlj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_0beNsBeuCwfaVbk8jGDWZg_nNiicK0O";
-const PRO_BEER_INSPECTOR_URL = "./data/pro-beer-inspector.json";
+const PRO_BEER_INSPECTOR_URL = "/data/pro-beer-inspector.json";
 const PASS_STANDARD = 35;
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -237,10 +237,16 @@ function readingSourceHtml(reading) {
 
 async function loadProfessionalBeerInspectorReadings() {
   try {
-    const response = await fetch(PRO_BEER_INSPECTOR_URL, { cache: "no-store" });
-    if (!response.ok) return [];
+    const url = `${PRO_BEER_INSPECTOR_URL}?v=${Date.now()}`;
+    console.info("Loading Professional Beer Inspector data", url);
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      console.error("Professional Beer Inspector data fetch failed", response.status, response.statusText, url);
+      return [];
+    }
     const payload = await response.json();
     const items = Array.isArray(payload) ? payload : (payload.readings || []);
+    console.info(`Loaded ${items.length} Professional Beer Inspector readings from ${url}`);
 
     return items.map((row, index) => ({
       id: row.id || `pbi-${index}`,
