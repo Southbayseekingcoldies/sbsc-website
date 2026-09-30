@@ -23,8 +23,7 @@ module.exports = async function handler(req, res) {
           "suggestions.placePrediction.placeId",
           "suggestions.placePrediction.text.text",
           "suggestions.placePrediction.structuredFormat.mainText.text",
-          "suggestions.placePrediction.structuredFormat.secondaryText.text",
-          "suggestions.placePrediction.distanceMeters"
+          "suggestions.placePrediction.structuredFormat.secondaryText.text"
         ].join(",")
       },
       body: JSON.stringify({
@@ -32,13 +31,12 @@ module.exports = async function handler(req, res) {
         includedRegionCodes: ["us"],
         languageCode: "en",
         regionCode: "US",
-        locationRestriction: {
+        locationBias: {
           circle: {
             center,
             radius: 50000
           }
-        },
-        origin: center
+        }
       })
     });
 
@@ -58,13 +56,9 @@ module.exports = async function handler(req, res) {
         placeId: p.placeId,
         text: p.text?.text || "",
         mainText: p.structuredFormat?.mainText?.text || p.text?.text || "",
-        secondaryText: p.structuredFormat?.secondaryText?.text || p.text?.text || "",
-        distanceMeters: Number.isFinite(Number(p.distanceMeters)) ? Number(p.distanceMeters) : null
+        secondaryText: p.structuredFormat?.secondaryText?.text || p.text?.text || ""
       }))
-      .filter(p => p.placeId && p.mainText)
-      // Hard safety net: when the browser supplied a real location, never show
-      // a prediction more than 50 km away even if Google ranks it oddly.
-      .filter(p => !Number.isFinite(lat) || !Number.isFinite(lng) || p.distanceMeters == null || p.distanceMeters <= 50000);
+      .filter(p => p.placeId && p.mainText);
 
     return res.status(200).json({ suggestions });
   } catch (error) {
