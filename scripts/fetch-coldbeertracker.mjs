@@ -315,8 +315,6 @@ async function collectViaCitySearch(page) {
     return added;
   };
 
-  // Cold Beer Tracker's Softr search box does not reliably expose
-  // placeholder="Search city". Find the visible search field more defensively.
   const input = page.locator([
     'input[type="search"]:visible',
     '[role="searchbox"]:visible',
@@ -335,69 +333,78 @@ async function collectViaCitySearch(page) {
     ariaLabel: el.getAttribute('aria-label') || '',
     name: el.getAttribute('name') || ''
   })).catch(() => ({}));
-
   console.log('Using Cold Beer Tracker search input:', inputMeta);
 
   const letters = 'abcdefghijklmnopqrstuvwxyz';
-  const probes = [
-    ...letters,
-    ...Array.from(letters).flatMap(a => Array.from(letters).map(b => `${a}${b}`))
-  ];
-
+  const visited = new Set();
   let probesRun = 0;
 
-  for (const term of probes) {
+  async function probe(term) {
+    if (visited.has(term)) return { visibleCount: 0, added: 0 };
+    visited.add(term);
+
+    await input.fill(term);
+    await page.waitForTimeout(300);
+
+    // Keep the filtered list near the top; most Softr lists render their first
+    // batch immediately after filtering.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(80);
+
+    const rows = await parseVisibleRecordsFromDom(page);
+    const added = add(rows);
+    probesRun += 1;
+
+    if (added > 0) {
+      console.log(`City probe "${term}" added ${added} record(s); ${collected.size} total.`);
+    }
+
+    return { visibleCount: rows.length, added };
+  }
+
+  // Adaptive prefix tree:
+  // Start with just 26 one-letter searches. Only split a prefix when its result
+  // set looks crowded. This avoids brute-forcing all 676 two-letter combinations
+  // on every daily run while still exposing cities hidden behind a capped list.
+  async function walk(prefix, depth = 1) {
+    const result = await probe(prefix);
+
+    // A broad prefix showing several records may be capped/ambiguous, so split it.
+    // Stop at four characters to avoid pathological runtimes.
+    if (result.visibleCount >= 4 && depth < 4) {
+      for (const letter of letters) {
+        await walk(`${prefix}${letter}`, depth + 1);
+      }
+    }
+  }
+
+  for (const letter of letters) {
     try {
-      await input.fill(term);
-      await page.waitForTimeout(325);
-
-      const before = collected.size;
-      add(await parseVisibleRecordsFromDom(page));
-
-      // Give a filtered list a few scroll chances without spending minutes
-      // blindly scrolling every probe.
-      let stagnant = 0;
-      let lastSize = collected.size;
-      for (let i = 0; i < 10; i += 1) {
-        await page.mouse.wheel(0, 850);
-        await page.waitForTimeout(120);
-        add(await parseVisibleRecordsFromDom(page));
-
-        if (collected.size === lastSize) stagnant += 1;
-        else stagnant = 0;
-
-        lastSize = collected.size;
-        if (stagnant >= 2) break;
-      }
-
-      await page.evaluate(() => window.scrollTo(0, 0));
-      probesRun += 1;
-
-      const added = collected.size - before;
-      if (added > 0) {
-        console.log(`City probe "${term}" added ${added} record(s); ${collected.size} total.`);
-      }
+      await walk(letter, 1);
     } catch (error) {
-      console.warn(`City search probe failed for "${term}":`, error.message);
+      console.warn(`City search branch failed for "${letter}":`, error.message);
+    }
+  }
+
+  // Targeted sanity probes for known multi-letter city starts that previously
+  // exposed missed records. These are cheap and make the regression obvious.
+  for (const term of ['wilm', 'herm', 'long', 'sant', 'newp', 'full']) {
+    try {
+      await probe(term);
+    } catch (error) {
+      console.warn(`City sanity probe failed for "${term}":`, error.message);
     }
   }
 
   try {
     await input.fill('');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(250);
   } catch {}
 
   console.log(
-    `City-search sweep ran ${probesRun} probes; ` +
+    `Adaptive city-search sweep ran ${probesRun} probes; ` +
     `${collected.size} unique records found through city search.`
   );
-
-  if (collected.size === 0) {
-    console.warn(
-      'City-search sweep found zero records. The selected input may still not be ' +
-      'the Cold Beer Tracker filter, or the filter may not respond in headless mode.'
-    );
-  }
 
   return [...collected.values()];
 }
