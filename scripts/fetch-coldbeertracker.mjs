@@ -303,78 +303,48 @@ async function collectRecordsWhileScrolling(page) {
 async function collectViaCitySearch(page) {
   const collected = new Map();
   const add = records => {
-    let added = 0;
     for (const record of records) {
       const key = `${record.bar}|${record.city}|${record.state}|${record.temp}`.toLowerCase();
-      if (!collected.has(key)) {
-        collected.set(key, record);
-        added += 1;
-      }
+      if (!collected.has(key)) collected.set(key, record);
     }
-    return added;
   };
 
   const input = page.locator('input[placeholder*="Search city" i], input[aria-label*="Search city" i]').first();
   if (await input.count() === 0) return [];
 
-  // Crawl the site's public city filter adaptively instead of relying on a
-  // hand-written prefix list. Start with a-z. If a prefix exposes a crowded
-  // result set, subdivide it (w -> wa..wz, wi -> wia..wiz, etc.). This catches
-  // cities such as Wilmington without hammering every possible prefix daily.
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-  const queue = [...alphabet];
-  const seenTerms = new Set();
-  const MAX_PREFIX_LENGTH = 3;
-  const SUBDIVIDE_AT = 6;
+  // A generated list can cap the blank/default view. Sweeping the public city
+  // filter exposes additional cards without needing private backend access.
+  // Exhaustive city-prefix sweep. The old hand-picked list could silently miss
+  // cities such as Wilmington because "wi" was never queried.
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  const probes = [
+    ...letters,
+    ...Array.from(letters).flatMap(a => Array.from(letters).map(b => `${a}${b}`))
+  ];
 
-  async function collectFilteredResults(term) {
-    await input.fill(term);
-    await page.waitForTimeout(350);
-
-    const termRecords = new Map();
-    const capture = async () => {
-      const rows = await parseVisibleRecordsFromDom(page);
-      for (const row of rows) {
-        const key = `${row.bar}|${row.city}|${row.state}|${row.temp}`.toLowerCase();
-        if (!termRecords.has(key)) termRecords.set(key, row);
-      }
-      add(rows);
-    };
-
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await capture();
-
-    // Scroll until the filtered result set stops growing, rather than an
-    // arbitrary fixed number of wheel events.
-    let stablePasses = 0;
-    let previousSize = termRecords.size;
-    for (let i = 0; i < 30; i += 1) {
-      await page.mouse.wheel(0, 900);
-      await page.waitForTimeout(140);
-      await capture();
-      if (termRecords.size === previousSize) stablePasses += 1;
-      else stablePasses = 0;
-      previousSize = termRecords.size;
-      if (stablePasses >= 4) break;
-    }
-
-    await page.evaluate(() => window.scrollTo(0, 0));
-    return [...termRecords.values()];
-  }
-
-  while (queue.length) {
-    const term = queue.shift();
-    if (!term || seenTerms.has(term)) continue;
-    seenTerms.add(term);
-
+  for (const term of probes) {
     try {
-      const rows = await collectFilteredResults(term);
+      await input.fill(term);
+      await page.waitForTimeout(350);
+      add(await parseVisibleRecordsFromDom(page));
 
-      // A busy prefix may be capped/virtualized by the source site. Split it
-      // into the next letter so older records hidden behind the cap are exposed.
-      if (rows.length >= SUBDIVIDE_AT && term.length < MAX_PREFIX_LENGTH) {
-        for (const letter of alphabet) queue.push(term + letter);
+      // Some result lists scroll inside a container after filtering. Keep going
+      // until repeated scrolls stop discovering new rows instead of using a fixed
+      // eight-scroll cap.
+      let stagnantRounds = 0;
+      let lastCollectedSize = collected.size;
+      for (let i = 0; i < 24; i += 1) {
+        await page.mouse.wheel(0, 850);
+        await page.waitForTimeout(140);
+        add(await parseVisibleRecordsFromDom(page));
+
+        if (collected.size === lastCollectedSize) stagnantRounds += 1;
+        else stagnantRounds = 0;
+
+        lastCollectedSize = collected.size;
+        if (stagnantRounds >= 3) break;
       }
+      await page.evaluate(() => window.scrollTo(0, 0));
     } catch (error) {
       console.warn(`City search probe failed for "${term}":`, error.message);
     }
@@ -385,7 +355,6 @@ async function collectViaCitySearch(page) {
     await page.waitForTimeout(300);
   } catch {}
 
-  console.log(`City-search crawler tested ${seenTerms.size} prefixes and found ${collected.size} unique records.`);
   return [...collected.values()];
 }
 
