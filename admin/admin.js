@@ -50,6 +50,7 @@ function attachVenueLookup(host,onPick){
 
   input.setAttribute("autocomplete","off");
   input.setAttribute("autocapitalize","words");
+  Object.assign(results.style,{maxHeight:"42vh",overflowY:"auto",overscrollBehavior:"contain",touchAction:"pan-y",WebkitOverflowScrolling:"touch"});
 
   input.addEventListener("input",()=>{
     clearTimeout(timer);
@@ -75,7 +76,7 @@ function attachVenueLookup(host,onPick){
           b.type="button";
           b.className="venue-hit";
           b.innerHTML=`<strong>${esc(hit.mainText||hit.text)}</strong><small>${esc(hit.secondaryText||hit.text||"")}</small>`;
-          b.onclick=async()=>{
+          const pickHit=async()=>{
             try{
               const p=await googleDetails(hit.placeId);
               onPick(p);
@@ -86,6 +87,15 @@ function attachVenueLookup(host,onPick){
               message(err.message||"Could not load that venue.","venue-error");
             }
           };
+
+          // Do not select on first finger contact. A vertical drag must scroll
+          // the dropdown; only a tap/release on the same row selects it.
+          let pointerStart=null,moved=false;
+          b.addEventListener("pointerdown",e=>{pointerStart={x:e.clientX,y:e.clientY,id:e.pointerId};moved=false});
+          b.addEventListener("pointermove",e=>{if(!pointerStart||e.pointerId!==pointerStart.id)return;const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;if(Math.hypot(dx,dy)>10)moved=true});
+          b.addEventListener("pointercancel",()=>{pointerStart=null;moved=false});
+          b.addEventListener("pointerup",e=>{if(!pointerStart||e.pointerId!==pointerStart.id)return;const tap=!moved;pointerStart=null;moved=false;if(!tap)return;e.preventDefault();pickHit()});
+          b.addEventListener("click",e=>{if(e.detail!==0){e.preventDefault();return}pickHit()});
           results.appendChild(b);
         });
         results.hidden=false;
