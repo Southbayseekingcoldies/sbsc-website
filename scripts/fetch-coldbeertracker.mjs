@@ -303,13 +303,10 @@ async function collectRecordsWhileScrolling(page) {
 async function collectViaCitySearch(page) {
   const collected = new Map();
 
-  const keyFor = record =>
-    `${record.bar}|${record.city}|${record.state}|${record.temp}`.toLowerCase();
-
   const add = records => {
     let added = 0;
     for (const record of records) {
-      const key = keyFor(record);
+      const key = `${record.bar}|${record.city}|${record.state}|${record.temp}`.toLowerCase();
       if (!collected.has(key)) {
         collected.set(key, record);
         added += 1;
@@ -318,80 +315,70 @@ async function collectViaCitySearch(page) {
     return added;
   };
 
-  const input = page.locator(
-    'input[placeholder*="Search city" i], input[aria-label*="Search city" i]'
-  ).first();
+  // Cold Beer Tracker's Softr search box does not reliably expose
+  // placeholder="Search city". Find the visible search field more defensively.
+  const input = page.locator([
+    'input[type="search"]:visible',
+    '[role="searchbox"]:visible',
+    'input[placeholder*="search" i]:visible',
+    'input[type="text"]:visible'
+  ].join(', ')).first();
 
-  if (await input.count() === 0) return [];
-
-  // Cold Beer Tracker can cap the broad/default list. The old scraper used a
-  // hand-picked set of city prefixes, which meant entire cities could be missed
-  // (for example Wilmington because "wi" was never queried).
-  //
-  // Query EVERY two-letter prefix so every city has a chance to become the
-  // initial visible result set. If a two-letter prefix still looks crowded,
-  // automatically subdivide it into three-letter prefixes too.
-  const letters = 'abcdefghijklmnopqrstuvwxyz';
-
-  async function runProbe(term) {
-    await input.fill(term);
-    await page.waitForTimeout(325);
-
-    const before = collected.size;
-    const visible = await parseVisibleRecordsFromDom(page);
-    add(visible);
-
-    // Reset document position between probes so one search does not inherit an
-    // odd scroll position from the previous one.
-    await page.evaluate(() => window.scrollTo(0, 0));
-
-    return {
-      visibleCount: visible.length,
-      newCount: collected.size - before
-    };
+  if (await input.count() === 0) {
+    console.warn('No visible Cold Beer Tracker search input was found.');
+    return [];
   }
 
+  const inputMeta = await input.evaluate(el => ({
+    type: el.getAttribute('type') || '',
+    placeholder: el.getAttribute('placeholder') || '',
+    ariaLabel: el.getAttribute('aria-label') || '',
+    name: el.getAttribute('name') || ''
+  })).catch(() => ({}));
+
+  console.log('Using Cold Beer Tracker search input:', inputMeta);
+
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  const probes = [
+    ...letters,
+    ...Array.from(letters).flatMap(a => Array.from(letters).map(b => `${a}${b}`))
+  ];
+
   let probesRun = 0;
-  let crowdedPrefixes = 0;
 
-  for (const a of letters) {
-    for (const b of letters) {
-      const prefix = `${a}${b}`;
+  for (const term of probes) {
+    try {
+      await input.fill(term);
+      await page.waitForTimeout(325);
 
-      try {
-        const result = await runProbe(prefix);
-        probesRun += 1;
+      const before = collected.size;
+      add(await parseVisibleRecordsFromDom(page));
 
-        if (result.newCount > 0) {
-          console.log(
-            `City probe "${prefix}" added ${result.newCount} record(s); ` +
-            `${collected.size} unique search records so far.`
-          );
-        }
+      // Give a filtered list a few scroll chances without spending minutes
+      // blindly scrolling every probe.
+      let stagnant = 0;
+      let lastSize = collected.size;
+      for (let i = 0; i < 10; i += 1) {
+        await page.mouse.wheel(0, 850);
+        await page.waitForTimeout(120);
+        add(await parseVisibleRecordsFromDom(page));
 
-        // A busy two-letter prefix may still hide rows behind the site's own
-        // result cap. Split it one level deeper instead of trying to brute-force
-        // an unreliable scrolling container.
-        if (result.visibleCount >= 4) {
-          crowdedPrefixes += 1;
-          for (const c of letters) {
-            try {
-              const deep = await runProbe(`${prefix}${c}`);
-              probesRun += 1;
-              if (deep.newCount > 0) {
-                console.log(
-                  `City probe "${prefix}${c}" added ${deep.newCount} record(s); ` +
-                  `${collected.size} unique search records so far.`
-                );
-              }
-            } catch (error) {
-              console.warn(`City search probe failed for "${prefix}${c}":`, error.message);
-            }
-          }
-        }
-      } catch (error) {
-        console.warn(`City search probe failed for "${prefix}":`, error.message);
+        if (collected.size === lastSize) stagnant += 1;
+        else stagnant = 0;
+
+        lastSize = collected.size;
+        if (stagnant >= 2) break;
       }
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      probesRun += 1;
+
+      const added = collected.size - before;
+      if (added > 0) {
+        console.log(`City probe "${term}" added ${added} record(s); ${collected.size} total.`);
+      }
+    } catch (error) {
+      console.warn(`City search probe failed for "${term}":`, error.message);
     }
   }
 
@@ -402,9 +389,15 @@ async function collectViaCitySearch(page) {
 
   console.log(
     `City-search sweep ran ${probesRun} probes; ` +
-    `${crowdedPrefixes} crowded two-letter prefixes were subdivided; ` +
     `${collected.size} unique records found through city search.`
   );
+
+  if (collected.size === 0) {
+    console.warn(
+      'City-search sweep found zero records. The selected input may still not be ' +
+      'the Cold Beer Tracker filter, or the filter may not respond in headless mode.'
+    );
+  }
 
   return [...collected.values()];
 }
@@ -578,8 +571,6 @@ async function main() {
     throw new Error('No records were parsed from coldbeertracker.com.');
   }
 
-  // Do not silently replace a known-good dataset with a smaller one just because
-  // the source site or browser automation glitched on a given day.
   if (previousCount > 0 && records.length < previousCount) {
     throw new Error(
       `Scrape regression blocked: found ${records.length} records, ` +
