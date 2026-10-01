@@ -8,7 +8,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const els = {
   sort: document.getElementById("sort"),
   temp: document.getElementById("temp"),
-  city: document.getElementById("city"),
+  search: document.getElementById("search"),
   cards: document.getElementById("cards"),
   status: document.getElementById("status"),
   count: document.getElementById("count"),
@@ -173,21 +173,6 @@ function haversineMiles(a, b) {
   const q = Math.sin(dLat / 2) ** 2 +
             Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(q));
-}
-
-function rebuildCityOptions() {
-  const current = els.city.value;
-  const cities = [...new Set(readings.map(r => r.city).filter(Boolean))].sort();
-  els.city.innerHTML = '<option value="all">All South Bay</option>';
-  cities.forEach(city => {
-    const opt = document.createElement("option");
-    opt.value = city;
-    opt.textContent = city;
-    els.city.appendChild(opt);
-  });
-  if ([...els.city.options].some(opt => opt.value === current)) {
-    els.city.value = current;
-  }
 }
 
 function markerColor(status) {
@@ -364,7 +349,6 @@ async function loadReadings() {
     return;
   }
 
-  rebuildCityOptions();
   render();
 }
 
@@ -391,7 +375,7 @@ function updateStats(sourceList) {
 
 function currentList() {
   const resultType = els.temp.value;
-  const city = els.city.value;
+  const searchTerm = (els.search.value || "").trim().toLowerCase();
 
   let list = readings
     .filter(r => {
@@ -399,7 +383,14 @@ function currentList() {
       if (resultType === "fails") return r.temp > PASS_STANDARD;
       return true;
     })
-    .filter(r => city === "all" ? true : r.city === city)
+    .filter(r => {
+      if (!searchTerm) return true;
+      const searchableText = [r.bar, r.city, r.state, r.address, r.beer, r.serveType]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return searchableText.includes(searchTerm);
+    })
     .map(r => ({
       ...r,
       distance: userPosition ? haversineMiles(userPosition, r) : null,
@@ -1577,7 +1568,7 @@ async function submitColdie(event) {
 
 els.sort.addEventListener("change", render);
 els.temp.addEventListener("change", render);
-els.city.addEventListener("change", render);
+els.search.addEventListener("input", render);
 els.locate.addEventListener("click", useLocation);
 els.venueSearch.addEventListener("input", () => {
   const term = els.venueSearch.value.trim();
