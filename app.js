@@ -259,10 +259,10 @@ function syncMapLegendLabels() {
   const legend = document.querySelector(".legend");
   if (!legend) return;
   legend.innerHTML = `
-    <span><i class="dot elite"></i> ≤30°F Certified Elite Coldies</span>
-    <span><i class="dot pass"></i> 31–35°F Certified Coldies</span>
-    <span><i class="dot fail"></i> 36–39°F Fail - Sweatin' 🥵</span>
-    <span><i class="dot fail"></i> 40°F+ Fail - Certified Soup 🔥</span>
+    <span><i class="dot elite"></i> ≤30° Elite</span>
+    <span><i class="dot pass"></i> 31–35° Coldie</span>
+    <span><i class="dot fail"></i> 36–39° Sweatin’ 🥵</span>
+    <span><i class="dot fail"></i> 40°+ Soup 🔥</span>
   `;
 }
 

@@ -31,13 +31,33 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="styles.css" />
   <style>
-    /* Compact public Results filter */
+    /* Compact map legend + Results control */
+    .map-shell {
+      margin-top: 0 !important;
+    }
+    .legend {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 9px 12px !important;
+      padding: 14px 16px 10px !important;
+      align-items: center !important;
+    }
+    .legend span {
+      min-width: 0 !important;
+      margin: 0 !important;
+      font-size: 13px !important;
+      line-height: 1.2 !important;
+      white-space: nowrap !important;
+    }
+    .legend .dot {
+      margin-right: 6px !important;
+    }
     .controls-panel {
       display: flex !important;
       align-items: center !important;
-      gap: 12px !important;
-      padding: 10px 2px !important;
-      margin: 4px 0 10px !important;
+      gap: 10px !important;
+      padding: 4px 16px 16px !important;
+      margin: 0 !important;
       background: transparent !important;
       border: 0 !important;
       border-radius: 0 !important;
@@ -62,14 +82,16 @@
       flex: 1 1 auto !important;
       width: auto !important;
       min-width: 0 !important;
-      height: 46px !important;
+      height: 44px !important;
       padding-top: 0 !important;
       padding-bottom: 0 !important;
       margin: 0 !important;
       border-radius: 11px !important;
     }
-    .map-shell {
-      margin-top: 0 !important;
+    @media (max-width: 390px) {
+      .legend { gap: 8px !important; padding-left: 12px !important; padding-right: 12px !important; }
+      .legend span { font-size: 12px !important; }
+      .controls-panel { padding-left: 12px !important; padding-right: 12px !important; }
     }
   </style>
 
@@ -87,11 +109,10 @@
   <main class="container">
     <section class="map-shell">
       <div id="map"></div>
-      <div class="legend"><span><i class="dot elite"></i> ≤30°F Elite</span><span><i class="dot pass"></i> 31–35°F Coldie</span><span><i class="dot fail"></i> 36°F+ Fail</span></div>
-    </section>
-
-    <section class="controls-panel">
-      <label><span>Results</span><select id="temp"><option value="all" selected>All verified readings</option><option value="coldies">All certified Coldies ✅</option><option value="fails">All verified fails ❌</option></select></label>
+      <div class="legend"><span><i class="dot elite"></i> ≤30° Elite</span><span><i class="dot pass"></i> 31–35° Coldie</span><span><i class="dot fail"></i> 36–39° Sweatin’ 🥵</span><span><i class="dot fail"></i> 40°+ Soup 🔥</span></div>
+      <section class="controls-panel">
+        <label><span>Results</span><select id="temp"><option value="all" selected>All verified readings</option><option value="coldies">All certified Coldies ✅</option><option value="fails">All verified fails ❌</option></select></label>
+      </section>
     </section>
 
     <section class="stats-grid" id="statsGrid">
