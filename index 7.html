@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SBSC — South Bay Seeking Coldies</title>
+  <meta name="description" content="South Bay Seeking Coldies — verified draft beer temperature readings across the South Bay." />
+  <link rel="canonical" href="https://southbaycoldies.com/" />
+  <meta name="theme-color" content="#d71920" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://southbaycoldies.com/" />
+  <meta property="og:title" content="South Bay Seeking Coldies" />
+  <meta property="og:description" content="Verified cold draft beer across the South Bay. Thermometer or it didn’t happen." />
+  <meta property="og:image" content="https://southbaycoldies.com/social-preview.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="South Bay Seeking Coldies — verified cold draft beer across the South Bay" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="South Bay Seeking Coldies" />
+  <meta name="twitter:description" content="Verified cold draft beer across the South Bay. Thermometer or it didn’t happen." />
+  <meta name="twitter:image" content="https://southbaycoldies.com/social-preview.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Compact map legend + Results control */
+    .map-shell {
+      margin-top: 0 !important;
+    }
+    .legend {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 9px 12px !important;
+      padding: 14px 16px 10px !important;
+      align-items: center !important;
+    }
+    .legend span {
+      min-width: 0 !important;
+      margin: 0 !important;
+      font-size: 13px !important;
+      line-height: 1.2 !important;
+      white-space: nowrap !important;
+    }
+    .legend .dot {
+      margin-right: 6px !important;
+    }
+    .controls-panel {
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      padding: 14px 16px 12px !important;
+      margin: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    .controls-panel label {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin: 0 !important;
+    }
+    .controls-panel label > span {
+      flex: 0 0 auto !important;
+      margin: 0 !important;
+      font-size: 13px !important;
+      line-height: 1 !important;
+      letter-spacing: .08em !important;
+    }
+    .controls-panel select {
+      flex: 1 1 auto !important;
+      width: auto !important;
+      min-width: 0 !important;
+      height: 44px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin: 0 !important;
+      border-radius: 11px !important;
+    }
+    @media (max-width: 390px) {
+      .legend { gap: 8px !important; padding-left: 12px !important; padding-right: 12px !important; }
+      .legend span { font-size: 12px !important; }
+      .controls-panel { padding-left: 12px !important; padding-right: 12px !important; }
+    }
+
+    /* Seasonal Halloween / fall accents — decorative only */
+    .hero {
+      position: relative !important;
+      overflow: hidden !important;
+    }
+    /* HALLOWEEN THEME — revert instantly by removing class="theme-halloween" from <body class="theme-halloween">. */
+    .seasonal-halloween { display:none; }
+    .theme-halloween .seasonal-halloween { display:block; position:absolute; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+    .theme-halloween .hero { isolation:isolate; }
+    .theme-halloween .hero-bg::after {
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(180deg,rgba(55,15,70,.10) 0%,rgba(236,108,18,.05) 58%,rgba(38,16,48,.13) 100%);
+      mix-blend-mode:multiply;
+    }
+    .h-web { position:absolute; width:88px; height:88px; opacity:.72; }
+    .h-web.left { left:-6px; top:-7px; transform:rotate(-4deg); }
+    .h-web.right { right:-8px; top:-7px; transform:scaleX(-1) rotate(-4deg); }
+    .h-bat { position:absolute; fill:#15101a; filter:drop-shadow(0 1px 1px rgba(255,255,255,.25)); opacity:.93; }
+    .h-bat.b1 { width:34px; left:31%; top:12%; transform:rotate(-12deg); }
+    .h-bat.b2 { width:22px; left:39%; top:22%; transform:rotate(10deg); }
+    .h-bat.b3 { width:30px; right:17%; top:9%; transform:rotate(8deg); }
+    .h-bat.b4 { width:19px; right:10%; top:20%; transform:rotate(-13deg); }
+    .h-bat.b5 { width:14px; left:51%; top:31%; transform:rotate(5deg); opacity:.72; }
+    .h-pumpkin { position:absolute; width:54px; right:1.4%; bottom:2%; filter:drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+    .h-pumpkin.small { width:34px; right:9%; bottom:1.5%; transform:rotate(-8deg); }
+    .h-ghost { position:absolute; width:30px; left:8%; top:34%; opacity:.68; filter:drop-shadow(0 1px 2px rgba(30,20,40,.35)); }
+    .h-leaves { position:absolute; left:0; right:0; bottom:0; height:34px; opacity:.9; }
+    .h-leaf { position:absolute; width:16px; height:9px; border-radius:80% 15% 80% 15%; background:#c65b19; transform:rotate(28deg); box-shadow:0 1px 1px rgba(0,0,0,.25); }
+    .h-leaf:nth-child(1){left:3%;bottom:5px;transform:rotate(18deg)} .h-leaf:nth-child(2){left:15%;bottom:1px;background:#9d3518;transform:rotate(-22deg)}
+    .h-leaf:nth-child(3){left:27%;bottom:4px;background:#e18a1d;transform:rotate(44deg)} .h-leaf:nth-child(4){left:71%;bottom:3px;background:#a53e17;transform:rotate(-34deg)}
+    .h-leaf:nth-child(5){left:82%;bottom:7px;background:#df7a17;transform:rotate(31deg)} .h-leaf:nth-child(6){left:93%;bottom:2px;background:#9e3115;transform:rotate(-18deg)}
+    .h-fog { position:absolute; left:-5%; right:-5%; bottom:10%; height:22%; opacity:.18; background:radial-gradient(ellipse at 20% 50%,#fff 0 24%,transparent 50%),radial-gradient(ellipse at 58% 60%,#fff 0 22%,transparent 48%),radial-gradient(ellipse at 88% 45%,#fff 0 18%,transparent 46%); filter:blur(5px); }
+    .theme-halloween .hero-actions { z-index:5; }
+    @media (max-width:480px){
+      .h-web{width:70px;height:70px}.h-pumpkin{width:42px}.h-pumpkin.small{width:27px}.h-ghost{width:24px}
+      .h-bat.b1{width:27px}.h-bat.b2{width:18px}.h-bat.b3{width:25px}.h-bat.b4{width:16px}.h-bat.b5{width:12px}
+    }
+  </style>
+
+</head>
+<body class="theme-halloween">
+  <header class="hero" aria-label="South Bay Seeking Coldies — Verified cold draft beer. Thermometer or it didn’t happen. 35°F or below. That’s a Coldie!">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <div class="seasonal-halloween" aria-hidden="true">
+      <svg class="h-web left" viewBox="0 0 100 100"><g fill="none" stroke="white" stroke-width="1.7"><path d="M0 0h100M0 0v100M0 0l88 88"/><path d="M22 0c0 12-10 22-22 22M44 0C44 24 24 44 0 44M68 0C68 38 38 68 0 68M94 0C94 52 52 94 0 94"/></g></svg>
+      <svg class="h-web right" viewBox="0 0 100 100"><g fill="none" stroke="white" stroke-width="1.7"><path d="M0 0h100M0 0v100M0 0l88 88"/><path d="M22 0c0 12-10 22-22 22M44 0C44 24 24 44 0 44M68 0C68 38 38 68 0 68M94 0C94 52 52 94 0 94"/></g></svg>
+      <svg class="h-bat b1" viewBox="0 0 100 44"><path d="M50 25c-8-15-17-17-24-12C15 2 6 3 0 7c7 4 11 10 12 18 9-6 18-5 27 2l11 12 11-12c9-7 18-8 27-2 1-8 5-14 12-18-6-4-15-5-26 6-7-5-16-3-24 12z"/></svg>
+      <svg class="h-bat b2" viewBox="0 0 100 44"><path d="M50 25c-8-15-17-17-24-12C15 2 6 3 0 7c7 4 11 10 12 18 9-6 18-5 27 2l11 12 11-12c9-7 18-8 27-2 1-8 5-14 12-18-6-4-15-5-26 6-7-5-16-3-24 12z"/></svg>
+      <svg class="h-bat b3" viewBox="0 0 100 44"><path d="M50 25c-8-15-17-17-24-12C15 2 6 3 0 7c7 4 11 10 12 18 9-6 18-5 27 2l11 12 11-12c9-7 18-8 27-2 1-8 5-14 12-18-6-4-15-5-26 6-7-5-16-3-24 12z"/></svg>
+      <svg class="h-bat b4" viewBox="0 0 100 44"><path d="M50 25c-8-15-17-17-24-12C15 2 6 3 0 7c7 4 11 10 12 18 9-6 18-5 27 2l11 12 11-12c9-7 18-8 27-2 1-8 5-14 12-18-6-4-15-5-26 6-7-5-16-3-24 12z"/></svg>
+      <svg class="h-bat b5" viewBox="0 0 100 44"><path d="M50 25c-8-15-17-17-24-12C15 2 6 3 0 7c7 4 11 10 12 18 9-6 18-5 27 2l11 12 11-12c9-7 18-8 27-2 1-8 5-14 12-18-6-4-15-5-26 6-7-5-16-3-24 12z"/></svg>
+      <svg class="h-ghost" viewBox="0 0 60 80"><path fill="#fff" d="M8 68V32C8 14 18 5 30 5s22 9 22 27v36l-8-7-7 8-7-8-7 8-7-8-8 7z"/><ellipse cx="23" cy="30" rx="4" ry="6" fill="#2d2233"/><ellipse cx="38" cy="30" rx="4" ry="6" fill="#2d2233"/><ellipse cx="30" cy="45" rx="5" ry="7" fill="#2d2233"/></svg>
+      <div class="h-fog"></div>
+      <svg class="h-pumpkin" viewBox="0 0 90 80"><path fill="#4b6b20" d="M43 13c1-9 6-13 13-13-3 7-3 11 0 16z"/><ellipse cx="45" cy="47" rx="39" ry="30" fill="#f47b16" stroke="#9c3d10" stroke-width="3"/><path fill="#ffcb35" d="M20 39l13-8-4 14zm50 0-13-8 4 14zM31 57h28l-8 9H39z"/></svg>
+      <svg class="h-pumpkin small" viewBox="0 0 90 80"><path fill="#4b6b20" d="M43 13c1-9 6-13 13-13-3 7-3 11 0 16z"/><ellipse cx="45" cy="47" rx="39" ry="30" fill="#e96514" stroke="#8e3410" stroke-width="3"/><path fill="#ffd34b" d="M20 39l13-8-4 14zm50 0-13-8 4 14zM31 57h28l-8 9H39z"/></svg>
+      <div class="h-leaves"><i class="h-leaf"></i><i class="h-leaf"></i><i class="h-leaf"></i><i class="h-leaf"></i><i class="h-leaf"></i><i class="h-leaf"></i></div>
+    </div>
+    <h1 class="sr-only">South Bay Seeking Coldies</h1>
+    <div class="hero-actions">
+      <button id="locate" class="hero-btn hero-btn-red">📍 Find a Coldie</button>
+      <button id="submit" class="hero-btn hero-btn-gold">🍺 Submit a Coldie</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="map-shell">
+      <section class="controls-panel">
+        <label><span>Results</span><select id="temp"><option value="all" selected>All verified readings</option><option value="coldies">All certified Coldies ✅</option><option value="fails">All verified fails ❌</option></select></label>
+      </section>
+      <div id="map"></div>
+      <div class="legend"><span><i class="dot elite"></i> ≤30° Elite</span><span><i class="dot pass"></i> 31–35° Coldie</span><span><i class="dot fail"></i> 36–39° Sweatin’ 🥵</span><span><i class="dot fail"></i> 40°+ Soup 🔥</span></div>
+    </section>
+
+    <section class="stats-grid" id="statsGrid">
+      <article class="stat-card stat-blue"><div class="stat-icon">🌡️</div><div><div class="stat-value" id="avgTemp">--</div><div class="stat-label">Average Draft Temp</div></div></article>
+      <article class="stat-card stat-green"><div class="stat-icon">✓</div><div><div class="stat-value" id="passRate">--</div><div class="stat-label">Passing Rate <small>(35°F or below)</small></div></div></article>
+      <article class="stat-card stat-blue"><div class="stat-icon">❄️</div><div><div class="stat-value" id="coldestPour">--</div><div class="stat-label">Coldest Pour</div></div></article>
+      <article class="stat-card stat-red"><div class="stat-icon">!</div><div><div class="stat-value" id="worstOffender">--</div><div class="stat-label">Worst Offender</div></div></article>
+    </section>
+
+    <section class="city-filter-panel">
+      <label><span>Search</span><input id="search" type="search" placeholder="Search bar, city, beer..." autocomplete="off" /></label>
+      <label><span>Sort</span><select id="sort"><option value="coldest">Coldest first</option><option value="nearest">Nearest first</option><option value="recent">Newest reading</option><option value="warmest">Warmest first</option></select></label>
+    </section>
+
+    <section class="results-head">
+      <div class="results-title"><span class="verified-mark">✓</span><div><h2>Verified Readings</h2><p id="status">Loading live SBSC readings…</p></div></div>
+      <div class="badge" id="count">0 results</div>
+    </section>
+    <section id="cards" class="cards"></section>
+  </main>
+
+  <dialog id="dialog">
+    <form id="form" class="submit-form">
+      <div class="dialog-head">
+        <div><h3>Submit a Coldie</h3><p>Every reading is reviewed before it appears on the map.</p></div>
+        <button id="close" type="button" class="ghost-x" aria-label="Close submission form">✕</button>
+      </div>
+
+      <div id="submissionFields">
+        <label class="venue-field">
+          <span>📍 Where are you drinking?</span>
+          <div class="venue-input-row">
+            <input id="venueSearch" type="text" placeholder="Search nearby bars & restaurants" autocomplete="off" autocapitalize="words" role="combobox" aria-autocomplete="list" aria-controls="venueResults" aria-expanded="false" />
+            <button id="refreshVenues" type="button" class="venue-nearby-btn" hidden>Nearby</button>
+          </div>
+          <div id="venueStatus" class="venue-status" hidden></div>
+          <div id="venueResults" class="venue-results" role="listbox" aria-label="Nearby bars and restaurants"></div>
+        </label>
+
+        <div class="form-row quick-row">
+          <label>
+            <span>Temperature °F</span>
+            <input id="temperatureF" name="temperature_f" type="number" inputmode="numeric" min="20" max="80" step="1" placeholder="34" required />
+            <small class="field-help">Round to the nearest whole number.</small>
+          </label>
+          <label>
+            <span>Beer type</span>
+            <select id="beerName" name="beer_name" required>
+              <option value="" selected disabled>Choose one</option>
+              <option value="Light / Crisp">Light / Crisp</option>
+              <option value="Ale / IPA">Ale / IPA</option>
+              <option value="Dark / Malty">Dark / Malty</option>
+              <option value="Other / Not sure">Other / Not sure</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="serve-type-field">
+          <span>Served as</span>
+          <select id="serveType" name="serve_type" required>
+            <option value="Draft" selected>Draft</option>
+            <option value="Bottle">Bottle</option>
+          </select>
+        </label>
+
+        <label><span>Thermometer photo <strong>required</strong></span><input id="photo" name="photo" type="file" accept="image/*" required /></label>
+        <p class="photo-help">Photo should clearly show the beer and thermometer reading. Maximum 10 MB.</p>
+
+        <label>
+          <span>Instagram handle <em>optional</em></span>
+          <input id="instagram" name="submitter_instagram" type="text" maxlength="80" placeholder="@yourhandle" autocapitalize="none" list="instagramSuggestions" />
+          <datalist id="instagramSuggestions"></datalist>
+        </label>
+
+        <label><span>Notes <em>optional</em></span><textarea id="notes" name="notes" maxlength="500" rows="2" placeholder="Anything useful about the pour?"></textarea></label>
+
+        <!-- Venue details are populated automatically after the user selects a nearby place. -->
+        <input id="barName" name="bar_name" type="hidden" />
+        <input id="barAddress" name="address" type="hidden" />
+        <input id="barCity" name="city" type="hidden" />
+        <input id="barState" name="state" type="hidden" value="CA" />
+          <input id="googlePlaceId" name="google_place_id" type="hidden" value="" />
+        <input id="measuredAt" name="measured_at" type="hidden" />
+        <input id="websiteField" name="website" type="text" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
+
+        <div id="submitMessage" class="submit-message" role="status" aria-live="polite"></div>
+        <button id="submitReading" type="submit" class="hero-btn hero-btn-blue full">Submit for Verification</button>
+        <p class="small-note">Submitting does not publish the reading. SBSC reviews the thermometer evidence first.</p>
+      </div>
+
+      <div id="submissionSuccess" class="submission-success" hidden>
+        <div class="success-icon">✓</div>
+        <h3>Submitted for verification.</h3>
+        <p>We’ll add it to the map once the thermometer evidence checks out. 🍺</p>
+        <button id="doneSubmission" type="button" class="hero-btn hero-btn-blue full">Done</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="site-footer">SBSC · South Bay Seeking Coldies</footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
