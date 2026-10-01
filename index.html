@@ -30,6 +30,49 @@
   <meta name="twitter:image" content="https://southbaycoldies.com/social-preview.png" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Compact public Results filter */
+    .controls-panel {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      padding: 10px 2px !important;
+      margin: 4px 0 10px !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    .controls-panel label {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin: 0 !important;
+    }
+    .controls-panel label > span {
+      flex: 0 0 auto !important;
+      margin: 0 !important;
+      font-size: 13px !important;
+      line-height: 1 !important;
+      letter-spacing: .08em !important;
+    }
+    .controls-panel select {
+      flex: 1 1 auto !important;
+      width: auto !important;
+      min-width: 0 !important;
+      height: 46px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin: 0 !important;
+      border-radius: 11px !important;
+    }
+    .map-shell {
+      margin-top: 0 !important;
+    }
+  </style>
+
 </head>
 <body>
   <header class="hero" aria-label="South Bay Seeking Coldies — Verified cold draft beer. Thermometer or it didn’t happen. 35°F or below. That’s a Coldie!">
