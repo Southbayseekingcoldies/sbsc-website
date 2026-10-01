@@ -56,7 +56,7 @@
       display: flex !important;
       align-items: center !important;
       gap: 10px !important;
-      padding: 4px 16px 16px !important;
+      padding: 14px 16px 12px !important;
       margin: 0 !important;
       background: transparent !important;
       border: 0 !important;
@@ -93,6 +93,40 @@
       .legend span { font-size: 12px !important; }
       .controls-panel { padding-left: 12px !important; padding-right: 12px !important; }
     }
+
+    /* Seasonal Halloween / fall accents — decorative only */
+    .hero {
+      position: relative !important;
+      overflow: hidden !important;
+    }
+    .hero::before {
+      content: "🦇   🦇";
+      position: absolute;
+      z-index: 3;
+      top: 9%;
+      right: 4%;
+      font-size: clamp(16px, 4vw, 28px);
+      letter-spacing: .25em;
+      transform: rotate(-8deg);
+      pointer-events: none;
+      filter: grayscale(1) brightness(.25);
+      opacity: .9;
+    }
+    .hero::after {
+      content: "🎃";
+      position: absolute;
+      z-index: 3;
+      right: 2.5%;
+      bottom: 4%;
+      font-size: clamp(24px, 6vw, 42px);
+      transform: rotate(7deg);
+      pointer-events: none;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,.22));
+    }
+    @media (max-width: 480px) {
+      .hero::before { top: 8%; right: 2%; font-size: 17px; }
+      .hero::after { right: 1.5%; bottom: 5%; font-size: 29px; }
+    }
   </style>
 
 </head>
@@ -108,11 +142,11 @@
 
   <main class="container">
     <section class="map-shell">
-      <div id="map"></div>
-      <div class="legend"><span><i class="dot elite"></i> ≤30° Elite</span><span><i class="dot pass"></i> 31–35° Coldie</span><span><i class="dot fail"></i> 36–39° Sweatin’ 🥵</span><span><i class="dot fail"></i> 40°+ Soup 🔥</span></div>
       <section class="controls-panel">
         <label><span>Results</span><select id="temp"><option value="all" selected>All verified readings</option><option value="coldies">All certified Coldies ✅</option><option value="fails">All verified fails ❌</option></select></label>
       </section>
+      <div id="map"></div>
+      <div class="legend"><span><i class="dot elite"></i> ≤30° Elite</span><span><i class="dot pass"></i> 31–35° Coldie</span><span><i class="dot fail"></i> 36–39° Sweatin’ 🥵</span><span><i class="dot fail"></i> 40°+ Soup 🔥</span></div>
     </section>
 
     <section class="stats-grid" id="statsGrid">
